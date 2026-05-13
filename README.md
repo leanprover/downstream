@@ -9,6 +9,28 @@ this exact situation. This is in an effort to make the developer experience as
 smooth as possible and not require external tools like `direnv` or runinng
 scripts manually that can easily be forgotten.
 
+## Getting started
+
+These scripts are meant to be added to the monorepo in question using
+`git subtree` using the command
+
+```bash
+git subtree add -P .downstream https://github.com/leanprover/downstream master -m "chore: add downstream"
+```
+
+and updated occasionally using the command
+
+```bash
+git subtree pull -P .downstream https://github.com/leanprover/downstream master -m "chore: update downstream"
+```
+
+To use one of the scripts, execute it with the first argument pointing to the
+monorepo, e.g.
+
+```bash
+python .downstream/update.py . -pU
+```
+
 ## Basic structure
 
 A monorepo contains two special files at its root:
