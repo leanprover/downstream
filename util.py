@@ -227,7 +227,7 @@ class Repo:
         base_sha = self.find_latest_subrepo_sha(subrepo)
         self.fetch_sha_tree(subrepo.url, base_sha)
 
-        run("git", "switch", "-c", branch, base_sha)
+        run("git", "switch", "-C", branch, base_sha)
         self.restore_tree_to(our_tree, Path())
 
         run(
@@ -237,16 +237,17 @@ class Repo:
         )
 
         # Remove our overrides
-        run("git", "rm", "-f", ".lake/package-overrides.json")
+        for file in Path().glob("**/.lake/package-overrides.json"):
+            file.unlink()
 
         # Restore all lean-toolchain files from the base commit
         for file in Path().glob("**/lean-toolchain"):
-            if file.is_file():
-                file.unlink()
+            file.unlink()
         run(
             *("git", "restore", "--worktree"),
             f"--source={base_sha}",
             ":(glob)**/lean-toolchain",
         )
 
+        run("git", "add", ".")
         self.commit("chore: nightly adaptations")
