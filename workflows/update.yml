@@ -1,0 +1,36 @@
+name: Update downstream and subrepos
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-downstream
+  cancel-in-progress: false
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # For git subtree
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update downstream
+        run: |
+          git subtree pull -P .downstream https://github.com/leanprover/downstream master -m "chore: update downstream"
+
+      - name: Update subrepos
+        run: python .downstream/update.py . -pU
+
+      - name: Push
+        run: git push origin HEAD:${{ github.ref_name }}
