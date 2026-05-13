@@ -24,9 +24,8 @@ issues mentioned by URL.
 ## Toolchains
 
 In order for each package to use the repo-wide toolchain, any file called
-`lean-toolchain` is removed in its subdirectory when it is initially added to
-the monorepo or updated. This way, elan will always use the `lean-toolchain`
-file in the monorepo root.
+`lean-toolchain` is replaced by a symlink to the `lean-toolchain` file in the
+monorepo root.
 
 When a PR branch is split off for a specific package, the `lean-toolchain` files
 are restored to their last known state. If the PR requires changes to the

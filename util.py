@@ -85,8 +85,9 @@ class Repo:
 
     def fixup_subrepo_toolchain(self, subrepo: Subrepo) -> None:
         for file in subrepo.path.glob("**/lean-toolchain"):
-            if file.is_file():
-                file.write_text(f"{self.toolchain}\n")
+            file.unlink()
+            relative = Path("lean-toolchain").relative_to(file.parent, walk_up=True)
+            file.symlink_to(relative)
 
     def fixup_subrepo_dependencies(self, subrepo: Subrepo) -> None:
         manifest_path = subrepo.path / "lake-manifest.json"
