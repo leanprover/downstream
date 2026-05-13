@@ -45,7 +45,7 @@ class Subrepo:
         return Path(self.name)
 
 
-def load_subrepos(path: Path) -> Generator[Subrepo]:
+def load_subrepos(path: Path) -> Generator[Subrepo, None, None]:
     for name, data in tomllib.loads(path.read_text()).items():
         url = normalize_url(data["url"])
         rev = data["rev"]
