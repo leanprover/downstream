@@ -53,6 +53,7 @@ def load_subrepos(path: Path) -> Generator[Subrepo]:
 
 class Repo:
     def __init__(self) -> None:
+        self.toolchain = Path("lean-toolchain").read_text().strip()
         self.subrepos = list(load_subrepos(Path("repos.toml")))
         self.subrepos_by_name = {repo.name: repo for repo in self.subrepos}
         self.subrepos_by_url = {repo.url: repo for repo in self.subrepos}
@@ -75,10 +76,9 @@ class Repo:
         )
 
     def fixup_subrepo_toolchain(self, subrepo: Subrepo) -> None:
-        # Remove all lean-toolchain files
         for file in subrepo.path.glob("**/lean-toolchain"):
             if file.is_file():
-                file.unlink()
+                file.write_text(f"{self.toolchain}\n")
 
     def fixup_subrepo_dependencies(self, subrepo: Subrepo) -> None:
         manifest_path = subrepo.path / "lake-manifest.json"
