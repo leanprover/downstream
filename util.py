@@ -38,6 +38,7 @@ class Subrepo:
     name: str
     url: str
     rev: str
+    override_only: bool
 
     @property
     def path(self) -> Path:
@@ -48,15 +49,22 @@ def load_subrepos(path: Path) -> Generator[Subrepo]:
     for name, data in tomllib.loads(path.read_text()).items():
         url = normalize_url(data["url"])
         rev = data["rev"]
-        yield Subrepo(name=name, url=url, rev=rev)
+        override_only = data.get("override_only", False)
+        yield Subrepo(name=name, url=url, rev=rev, override_only=override_only)
 
 
 class Repo:
     def __init__(self) -> None:
         self.toolchain = Path("lean-toolchain").read_text().strip()
-        self.subrepos = list(load_subrepos(Path("repos.toml")))
-        self.subrepos_by_name = {repo.name: repo for repo in self.subrepos}
-        self.subrepos_by_url = {repo.url: repo for repo in self.subrepos}
+        subrepos = list(load_subrepos(Path("repos.toml")))
+
+        self.overrides = [r for r in subrepos if r.override_only]
+        self.overrides_by_name = {r.name: r for r in self.overrides}
+        self.overrides_by_url = {r.url: r for r in self.overrides}
+
+        self.subrepos = [r for r in subrepos if not r.override_only]
+        self.subrepos_by_name = {r.name: r for r in self.subrepos}
+        self.subrepos_by_url = {r.url: r for r in self.subrepos}
 
     def reset(self) -> None:
         run("git", "clean", "-dffx")
@@ -91,18 +99,20 @@ class Repo:
             if package["type"] != "git":
                 continue
             url = normalize_url(package["url"])
-            repo = self.subrepos_by_url.get(url)
-            if not repo:
-                continue
 
-            package["type"] = "path"
-            package["dir"] = f"../{repo.name}"
-            package["scope"] = ""
-            del package["url"]
-            del package["rev"]
-            del package["inputRev"]
-
-            packages.append(package)
+            if repo := self.overrides_by_url.get(url):
+                sha, _ = self.fetch_sha_tree(repo.url, repo.rev)
+                package["input_rev"] = repo.rev
+                package["rev"] = sha
+                packages.append(package)
+            elif repo := self.subrepos_by_url.get(url):
+                package["type"] = "path"
+                package["dir"] = f"../{repo.name}"
+                package["scope"] = ""
+                del package["url"]
+                del package["rev"]
+                del package["inputRev"]
+                packages.append(package)
 
         overrides = {"version": manifest["version"], "packages": packages}
         override_path.parent.mkdir(parents=True, exist_ok=True)
