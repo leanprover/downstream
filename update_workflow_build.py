@@ -8,28 +8,29 @@ from typing import Any
 
 import yaml12
 
-from util import Repo, Subrepo, normalize_url
+from downstream.updater import Updater
+from downstream.util import Subrepo, normalize_url
 
 
-def get_subrepos(repo: Repo) -> Generator[tuple[Subrepo, list[Subrepo]]]:
-    for subrepo in repo.subrepos:
+def get_subrepos(updater: Updater) -> Generator[tuple[Subrepo, list[Subrepo]]]:
+    for subrepo in updater.subrepos:
         dependencies = []
         manifest = json.loads(subrepo.manifest_path.read_text())
         for package in manifest["packages"]:
             if package["type"] != "git":
                 continue
             url = normalize_url(package["url"])
-            if dep := repo.subrepos_by_url.get(url):
+            if dep := updater.subrepos_by_url.get(url):
                 dependencies.append(dep)
         yield subrepo, dependencies
 
 
 def get_subrepos_dicts(
-    repo: Repo,
+    updater: Updater,
 ) -> tuple[dict[str, Subrepo], dict[str, list[Subrepo]]]:
     subrepo_by_name = {}
     deps_by_name = {}
-    for subrepo, dependencies in get_subrepos(repo):
+    for subrepo, dependencies in get_subrepos(updater):
         subrepo_by_name[subrepo.name] = subrepo
         deps_by_name[subrepo.name] = dependencies
     return subrepo_by_name, deps_by_name
@@ -61,8 +62,8 @@ def gh_emoji_case(outcome: str) -> str:
     return f"case({', '.join(caselist)})"
 
 
-def configure_steps(repo: Repo) -> list[Any]:
-    subrepos_by_name, deps_by_name = get_subrepos_dicts(repo)
+def configure_steps(updater: Updater) -> list[Any]:
+    subrepos_by_name, deps_by_name = get_subrepos_dicts(updater)
 
     steps: list[Any] = []
 
@@ -90,7 +91,7 @@ def configure_steps(repo: Repo) -> list[Any]:
     # Generate report
     lines = []
     lines.append("echo '# Build results' >> $GITHUB_STEP_SUMMARY")
-    for subrepo in repo.subrepos:
+    for subrepo in updater.subrepos:
         outcome = f"steps.check-{subrepo.name}.outcome"
         emoji = gh_emoji_case(outcome)
         md_line = f"- {gh_expr(emoji)} `{subrepo.name}` ({gh_expr(outcome)})"
@@ -115,14 +116,14 @@ def main() -> None:
     args = parser.parse_args(namespace=Args())
 
     os.chdir(args.downstream)
-    repo = Repo()
+    updater = Updater()
 
     template_path = Path(f".github/workflows/{args.name}.template")
     output_path = Path(f".github/workflows/{args.name}")
 
     workflow: Any = yaml12.read_yaml(template_path)
     main = workflow.setdefault("jobs", {}).setdefault("main", {})
-    main["steps"] = configure_steps(repo)
+    main["steps"] = configure_steps(updater)
     yaml12.write_yaml(workflow, output_path)
 
 
