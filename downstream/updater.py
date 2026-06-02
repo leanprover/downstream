@@ -152,16 +152,12 @@ class Updater:
         print("::endgroup::", flush=True)
 
     def add_or_update_subrepo(self, subrepo: Subrepo) -> None:
-        self.reset()
-
         if subrepo.path.exists():
             self.update_subrepo(subrepo)
         else:
             self.add_subrepo(subrepo)
 
     def prune_subrepos(self) -> None:
-        self.reset()
-
         for path in Path().iterdir():
             if not path.is_dir():
                 continue
