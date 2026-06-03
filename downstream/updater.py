@@ -151,6 +151,12 @@ class Updater:
         self.commit(f"downstream: remove repo {path.name}")
         print("::endgroup::", flush=True)
 
+    def add_or_reset_subrepo(self, subrepo: Subrepo) -> None:
+        if subrepo.path.exists():
+            self.reset_subrepo(subrepo)
+        else:
+            self.add_subrepo(subrepo)
+
     def add_or_update_subrepo(self, subrepo: Subrepo) -> None:
         if subrepo.path.exists():
             self.update_subrepo(subrepo)
