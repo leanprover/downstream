@@ -44,12 +44,19 @@ placeholders for the next sections):
 - `upstream-branch` (default: `downstream`): The name of a branch in the
   upstream repo that marks the latest upstream commit that downstream CI was
   green for.
-- `downstream-action` (default: `adaptation-create.yml`): The name of the action
-  to call in the downstream repo that creates the adaptation PR.
-- `upstream-token`: A GitHub token to push commits to the upstream PR with,
-  because the default token does not trigger CI.
-- `downstream-token`: A GitHub token with sufficient permissions to dispatch the
-  `adaptation-create.yml` action in the downstream repo.
+- `downstream-repo`: The downstream repository to search for adaptation PRs and
+  dispatch the downstream action in, in `owner/repo` format.
+- `downstream-workflow` (default: `adaptation-create.yml`): The name of the
+  workflow to call in the downstream repo that creates the adaptation PR.
+- `app-token`: GitHub token for the app to use when interacting with GitHub.
+  Must have access to both repos with the following permissions:
+  - _Actions_ write access, to trigger the downstream action
+  - _Contents_ write access, to auto-rebase the upstream PR
+  - _Issues_ write access, to leave comments on the upstream PR
+  - _Pull requests_ read access, to search for adaptation PRs
+  - _Workflows_ read access, to wait for the downstream action
+- `app-slug`: Slug of the app being used. Can be obtained at the same time as
+  the token using https://github.com/actions/create-github-app-token.
 
 The action roughly performs the following steps:
 

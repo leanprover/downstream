@@ -1,0 +1,42 @@
+name: Create an adaptation PR
+
+inputs:
+  app-token:
+    description: GitHub app token.
+    required: true
+
+  app-slug:
+    description: GitHub app slug.
+    required: true
+
+  label-requested:
+    description: >
+      Label to add to an upstream PR to trigger adaptation PR creation.
+    default: downstream requested
+
+  label-provided:
+    description: >
+      Label that's added to an upstream PR once the adaptation PR exists.
+    default: downstream provided
+
+  upstream-branch:
+    description: >
+      Branch in the upstream repo that marks the latest commit with green
+      downstream CI.
+    default: downstream
+
+  downstream-repo:
+    description: >
+      The downstream repository to search for adaptation PRs and dispatch the
+      downstream action in, in "owner/repo" format.
+    required: true
+
+  downstream-workflow:
+    description: >
+      Name of the workflow to call in the downstream repo that creates the
+      adaptation PR.
+    required: true
+
+runs:
+  using: node24
+  main: dist/index.js
