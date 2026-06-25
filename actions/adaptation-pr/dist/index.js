@@ -24837,7 +24837,7 @@ async function createAdaptationPrFor(uPr, aBranchName) {
     ...downstreamRepo,
     base: defaultBranch,
     head: aBranchName,
-    title: `Adaptations for ${uPrRef}: ${uPr.title}`,
+    title: `[#${uPr.number}] ${uPr.title}`,
     body: `This is the adaptation PR for ${uPrRef}.`
   });
   core2.info(`Created adaptation PR #${data.number}`);
