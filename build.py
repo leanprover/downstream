@@ -1,32 +1,13 @@
-import json
 import os
 from argparse import ArgumentParser
-from graphlib import TopologicalSorter
 from pathlib import Path
 
 from downstream.updater import Updater
-from downstream.util import Subrepo, normalize_url, run
+from downstream.util import Subrepo, run
 
 SKIPPED = "⏭️"
 SUCCESS = "✅"
 FAILURE = "🟥"
-
-
-def topo_subrepos(updater: Updater) -> list[Subrepo]:
-    graph: dict[str, set[str]] = {}
-    for subrepo in updater.subrepos:
-        deps: set[str] = set()
-        manifest = json.loads(subrepo.manifest_path.read_text())
-        for package in manifest["packages"]:
-            if package["type"] != "git":
-                continue
-            url = normalize_url(package["url"])
-            if dep := updater.subrepos_by_url.get(url):
-                deps.add(dep.name)
-        graph[subrepo.name] = deps
-
-    order = TopologicalSorter(graph).static_order()
-    return [updater.subrepos_by_name[name] for name in order]
 
 
 def check_cmd(subrepo: Subrepo, command: str) -> bool:
@@ -86,7 +67,7 @@ def main() -> None:
 
     os.chdir(args.downstream)
     updater = Updater()
-    subrepos = topo_subrepos(updater)
+    subrepos = updater.topo_subrepos()
 
     report = ["# Build report"]
     critical_failed = False
