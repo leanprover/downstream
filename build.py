@@ -15,12 +15,17 @@ def check_cmd(subrepo: Subrepo, command: str) -> bool:
     return result.returncode == 0
 
 
-def run_cmd(subrepo: Subrepo, command: str) -> bool | None:
-    result = run("lake", command, cwd=subrepo.path, check=False)
+def run_cmd(subrepo: Subrepo, command: str, *args: str) -> bool | None:
+    result = run("lake", command, *args, cwd=subrepo.path, check=False)
     return result.returncode == 0
 
 
-def do_phase(subrepos: list[Subrepo], report: list[str], command: str) -> bool:
+def do_phase(
+    subrepos: list[Subrepo],
+    report: list[str],
+    command: str,
+    mappings_dir: Path | None = None,
+) -> bool:
     report.append("")
     report.append(f"## `lake {command}`")
     critical_failed = False
@@ -29,11 +34,15 @@ def do_phase(subrepos: list[Subrepo], report: list[str], command: str) -> bool:
         # https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#grouping-log-lines
         print(f"::group::{command} {subrepo.name}", flush=True)
 
+        args: list[str] = []
+        if mappings_dir is not None:
+            args += ["-o", str(mappings_dir / f"{subrepo.name}.jsonl")]
+
         noncritical = "" if subrepo.critical else " (non-critical)"
         if not check_cmd(subrepo, command):
             report.append(f"- {SKIPPED} {subrepo.name}{noncritical}")
             continue
-        if run_cmd(subrepo, command):
+        if run_cmd(subrepo, command, *args):
             report.append(f"- {SUCCESS} {subrepo.name}{noncritical}")
         else:
             report.append(f"- {FAILURE} {subrepo.name}{noncritical}")
@@ -50,6 +59,7 @@ class Args:
     test: bool
     lint: bool
     report: Path | None
+    mappings: Path | None
 
 
 def main() -> None:
@@ -60,10 +70,26 @@ def main() -> None:
     )
     parser.add_argument("-t", "--test", action="store_true", help="enable testing")
     parser.add_argument("-l", "--lint", action="store_true", help="enable linting")
-    parser.add_argument("--report", type=Path, help="write a markdown report to PATH")
+    parser.add_argument(
+        "--report",
+        type=Path,
+        metavar="PATH",
+        help="write a markdown report to PATH",
+    )
+    parser.add_argument(
+        "--mappings",
+        type=Path,
+        metavar="DIR",
+        help="write build mappings to DIR",
+    )
     args = parser.parse_args(namespace=Args())
 
     report_path = None if args.report is None else args.report.resolve()
+
+    mappings_dir = None
+    if args.mappings is not None:
+        mappings_dir = args.mappings.resolve()
+        mappings_dir.mkdir(parents=True, exist_ok=True)
 
     os.chdir(args.downstream)
     updater = Updater()
@@ -73,7 +99,7 @@ def main() -> None:
     critical_failed = False
 
     if not args.no_build:
-        critical_failed |= do_phase(subrepos, report, "build")
+        critical_failed |= do_phase(subrepos, report, "build", mappings_dir)
     if args.test:
         critical_failed |= do_phase(subrepos, report, "test")
     if args.lint:
