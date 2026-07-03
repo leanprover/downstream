@@ -96,6 +96,8 @@ def main() -> None:
     updater = Updater()
     subrepos = updater.topo_subrepos()
 
+    run("lake", "--version")
+
     report_build = {}
     if not args.no_build:
         report_build = do_phase(subrepos, "build", mappings_dir)
