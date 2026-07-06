@@ -68,7 +68,10 @@ class Updater:
         )
 
     def fixup_subrepo_toolchain(self, subrepo: Subrepo) -> None:
+        subrepo_toolchain = (subrepo.path / "lean-toolchain").read_text().strip()
         for file in subrepo.path.glob("**/lean-toolchain"):
+            if file.read_text().strip() != subrepo_toolchain:
+                continue
             file.unlink()
             relative = Path("lean-toolchain").relative_to(file.parent, walk_up=True)
             file.symlink_to(relative)
