@@ -22,7 +22,7 @@ class Updater:
         self.subrepos_by_name = {r.name: r for r in self.subrepos}
         self.subrepos_by_url = {r.url: r for r in self.subrepos}
 
-    def topo_subrepos(self) -> list[Subrepo]:
+    def dep_graph(self) -> dict[str, set[str]]:
         graph: dict[str, set[str]] = {}
         for subrepo in self.subrepos:
             deps: set[str] = set()
@@ -34,7 +34,10 @@ class Updater:
                 if dep := self.subrepos_by_url.get(url):
                     deps.add(dep.name)
             graph[subrepo.name] = deps
+        return graph
 
+    def topo_subrepos(self) -> list[Subrepo]:
+        graph = self.dep_graph()
         order = TopologicalSorter(graph).static_order()
         return [self.subrepos_by_name[name] for name in order]
 
