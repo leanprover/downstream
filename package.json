@@ -5,8 +5,8 @@
   "description": "GitHub Actions for the adaptation PR process. See doc/adaptation_prs.md.",
   "scripts": {
     "build": "node actions/build.mjs",
-    "check": "prettier --check . && tsc --noEmit",
-    "fmt": "prettier --write ."
+    "check": "prettier --check . && tsc --noEmit && uv format --check && uvx pyrefly check",
+    "fmt": "prettier --write . && uv format"
   },
   "dependencies": {
     "@actions/core": "^3.0.1",
