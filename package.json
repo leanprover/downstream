@@ -4,7 +4,7 @@
   "private": true,
   "description": "GitHub Actions for the adaptation PR process. See doc/adaptation_prs.md.",
   "scripts": {
-    "build": "node build.mjs",
+    "build": "node actions/build.mjs",
     "check": "prettier --check . && tsc --noEmit",
     "fmt": "prettier --write ."
   },
