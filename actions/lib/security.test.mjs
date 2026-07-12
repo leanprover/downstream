@@ -216,6 +216,7 @@ test("rejects updater output symlinks that escape the checkout", () => {
   const temp = mkdtempSync(path.join(tmpdir(), "downstream-symlink-test-"));
   const clone = path.join(temp, "clone");
   const outside = path.join(temp, "outside");
+  const override = path.join(clone, "target/.lake/package-overrides.json");
 
   try {
     mkdirSync(path.join(clone, "target/.lake"), { recursive: true });
@@ -233,18 +234,41 @@ url = "https://example.invalid/target"
 rev = "HEAD"
 `,
     );
-    symlinkSync(
-      outside,
-      path.join(clone, "target/.lake/package-overrides.json"),
-    );
+    symlinkSync(outside, override);
     commitFixture(
       clone,
       "initial\n\ndownstream-repo: target\ndownstream-sha: HEAD",
     );
+    rmSync(override);
+    writeFileSync(override, "safe\n");
 
     const result = runPinnedUpdater(clone);
     assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stderr, /unsafe symlink path/);
     assert.equal(readFileSync(outside, "utf8"), "unchanged\n");
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+test("rejects git pathspec-magic subrepo names", () => {
+  const temp = mkdtempSync(path.join(tmpdir(), "downstream-name-test-"));
+  const clone = path.join(temp, "clone");
+
+  try {
+    mkdirSync(clone);
+    writeFileSync(path.join(clone, "lean-toolchain"), "x\n");
+    writeFileSync(
+      path.join(clone, "repos.toml"),
+      `[":(glob)*"]
+url = "https://example.invalid/target"
+rev = "HEAD"
+`,
+    );
+
+    const result = runPinnedUpdater(clone);
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stderr, /invalid subrepo name/);
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }

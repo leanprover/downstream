@@ -71,7 +71,7 @@ def load_subrepos(path: Path) -> Generator[Subrepo]:
     for name, data in tomllib.loads(path.read_text()).items():
         if (
             not name
-            or name.startswith((".", "-"))
+            or name.startswith((".", "-", ":"))
             or PurePosixPath(name).name != name
             or PureWindowsPath(name).name != name
         ):

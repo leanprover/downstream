@@ -122,6 +122,7 @@ class Updater:
                 packages.append(package)
 
         overrides = {"version": manifest["version"], "packages": packages}
+        self.ensure_safe_path(subrepo.override_path)
         subrepo.override_path.parent.mkdir(parents=True, exist_ok=True)
         subrepo.override_path.write_text(json.dumps(overrides, indent=2))
 
