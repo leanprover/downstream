@@ -274,6 +274,86 @@ rev = "HEAD"
   }
 });
 
+test("stages wildcard subrepo names literally", () => {
+  const temp = mkdtempSync(path.join(tmpdir(), "downstream-pathspec-test-"));
+  const clone = path.join(temp, "clone");
+  const subrepo = path.join(clone, "*");
+  const unrelated = path.join(clone, "unrelated.txt");
+  const siblingOverride = path.join(
+    clone,
+    "other/.lake/package-overrides.json",
+  );
+
+  try {
+    mkdirSync(subrepo, { recursive: true });
+    mkdirSync(path.dirname(siblingOverride), { recursive: true });
+    writeFileSync(path.join(clone, "lean-toolchain"), "x\n");
+    writeFileSync(path.join(subrepo, "lean-toolchain"), "x\n");
+    writeFileSync(
+      path.join(subrepo, "lake-manifest.json"),
+      JSON.stringify({ version: "1.1.0", packages: [] }),
+    );
+    writeFileSync(unrelated, "original\n");
+    writeFileSync(siblingOverride, "original\n");
+    writeFileSync(
+      path.join(clone, "repos.toml"),
+      `["*"]
+url = "https://example.invalid/target"
+rev = "HEAD"
+`,
+    );
+    commitFixture(clone, "initial");
+
+    const result = spawnSync(
+      "uv",
+      [
+        "run",
+        "python",
+        "-c",
+        `import os
+import sys
+from pathlib import Path
+from downstream.updater import Updater
+
+os.chdir(sys.argv[1])
+updater = Updater()
+Path("unrelated.txt").write_text("changed\\n")
+Path("other/.lake/package-overrides.json").write_text("changed\\n")
+subrepo = updater.subrepos_by_name["*"]
+updater.fixup_subrepo_and_commit(subrepo, "HEAD", "fixup repo *")
+`,
+        clone,
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: updaterEnvironment(process.env),
+      },
+    );
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+
+    const committed = execFileSync(
+      "git",
+      ["show", "--format=", "--name-only", "HEAD"],
+      { cwd: clone, encoding: "utf8" },
+    );
+    assert.match(committed, /^\*\//m);
+    assert.doesNotMatch(committed, /^other\/\.lake\/package-overrides\.json$/m);
+    assert.doesNotMatch(committed, /^unrelated\.txt$/m);
+    assert.equal(readFileSync(siblingOverride, "utf8"), "changed\n");
+    assert.equal(readFileSync(unrelated, "utf8"), "changed\n");
+    assert.equal(
+      execFileSync("git", ["diff", "--name-only"], {
+        cwd: clone,
+        encoding: "utf8",
+      }).trim(),
+      "other/.lake/package-overrides.json\nunrelated.txt",
+    );
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
 test("rejects subrepo names that escape the checkout", () => {
   const temp = mkdtempSync(path.join(tmpdir(), "downstream-name-test-"));
   const clone = path.join(temp, "clone");

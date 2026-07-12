@@ -145,8 +145,14 @@ class Updater:
             f"downstream-sha: {sha}",
         ])
 
-        run("git", "add", "--", subrepo.path)
-        run("git", "add", "--force", "--", subrepo.override_path)
+        run("git", "add", "--", f":(literal){subrepo.path.as_posix()}")
+        run(
+            "git",
+            "add",
+            "--force",
+            "--",
+            f":(literal){subrepo.override_path.as_posix()}",
+        )
         self.commit(message)
 
     def find_latest_subrepo_sha(self, subrepo: Subrepo) -> str:
