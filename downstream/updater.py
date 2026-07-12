@@ -11,16 +11,36 @@ from downstream.util import Subrepo, github_full_name, load_subrepos, normalize_
 
 class Updater:
     def __init__(self) -> None:
+        self.root = Path.cwd().resolve()
         self.toolchain = Path("lean-toolchain").read_text().strip()
         subrepos = list(load_subrepos(Path("repos.toml")))
+        for subrepo in subrepos:
+            self.ensure_safe_path(subrepo.path)
+            self.ensure_safe_path(subrepo.override_path)
 
         self.overrides = [r for r in subrepos if r.override_only]
         self.overrides_by_name = {r.name: r for r in self.overrides}
-        self.overrides_by_url = {url: r for r in self.overrides for url in (r.url, r.fetch_url)}
+        self.overrides_by_url = {
+            url: r for r in self.overrides for url in (r.url, r.fetch_url)
+        }
 
         self.subrepos = [r for r in subrepos if not r.override_only]
         self.subrepos_by_name = {r.name: r for r in self.subrepos}
-        self.subrepos_by_url = {url: r for r in self.subrepos for url in (r.url, r.fetch_url)}
+        self.subrepos_by_url = {
+            url: r for r in self.subrepos for url in (r.url, r.fetch_url)
+        }
+
+    def ensure_safe_path(self, path: Path) -> None:
+        for component in (path, *path.parents):
+            if component == Path("."):
+                break
+            if component.is_symlink():
+                raise ValueError(f"unsafe symlink path: {path}")
+
+        try:
+            path.resolve().relative_to(self.root)
+        except (OSError, RuntimeError, ValueError) as error:
+            raise ValueError(f"path escapes downstream root: {path}") from error
 
     def dep_graph(self, external: bool = False) -> dict[str, set[str]]:
         graph: dict[str, set[str]] = {}
@@ -49,11 +69,11 @@ class Updater:
 
     def fetch_sha_tree(self, url: str, rev: str) -> tuple[str, str]:
         try:
-            run("git", "fetch", "--depth=1", url, rev)
+            run("git", "fetch", "--depth=1", "--", url, rev)
         except CalledProcessError:
             # Retrying once since this command occasionally fails with the error
             # "fatal: shallow file has changed since we read it".
-            run("git", "fetch", "--depth=1", url, rev)
+            run("git", "fetch", "--depth=1", "--", url, rev)
 
         sha = run("git", "rev-parse", "FETCH_HEAD", capture=True).stdout.strip()
         tree = run("git", "rev-parse", "FETCH_HEAD^{tree}", capture=True).stdout.strip()
@@ -124,8 +144,8 @@ class Updater:
             f"downstream-sha: {sha}",
         ])
 
-        run("git", "add", subrepo.path)
-        run("git", "add", "--force", subrepo.override_path)
+        run("git", "add", "--", subrepo.path)
+        run("git", "add", "--force", "--", subrepo.override_path)
         self.commit(message)
 
     def find_latest_subrepo_sha(self, subrepo: Subrepo) -> str:
@@ -189,7 +209,7 @@ class Updater:
         print(f"::group::prune {path.name}", flush=True)
         self.reset()
 
-        run("git", "rm", "-rf", path)
+        run("git", "rm", "-rf", "--", path)
         self.commit(f"downstream: remove repo {path.name}")
         print("::endgroup::", flush=True)
 
@@ -243,5 +263,5 @@ class Updater:
             ":(glob)**/lean-toolchain",
         )
 
-        run("git", "add", ".")
+        run("git", "add", "--", ".")
         self.commit("chore: nightly adaptations")

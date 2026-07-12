@@ -1,6 +1,3 @@
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
-
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as github from "@actions/github";
@@ -8,6 +5,11 @@ import { RequestError } from "@octokit/request-error";
 import type { GetResponseDataTypeFromEndpointMethod as Response } from "@octokit/types";
 
 import { postOrUpdateStatus } from "../lib/status-message";
+import {
+  pushBranch,
+  runUpdater,
+  writeToolchainOverride,
+} from "../lib/security";
 import {
   abort,
   adaptationBranchNameFor,
@@ -28,7 +30,20 @@ import {
 
 type Branch = Response<Octokit["rest"]["repos"]["getBranch"]>;
 
-const appToken = getInput("app-token");
+const appToken = getInputOpt("app-token");
+const upstreamToken =
+  getInputOpt("upstream-token") ??
+  appToken ??
+  abort("upstream-token or app-token is required");
+const downstreamToken =
+  getInputOpt("downstream-token") ??
+  appToken ??
+  abort("downstream-token or app-token is required");
+core.setSecret(upstreamToken);
+core.setSecret(downstreamToken);
+delete process.env["INPUT_APP-TOKEN"];
+delete process.env["INPUT_UPSTREAM-TOKEN"];
+delete process.env["INPUT_DOWNSTREAM-TOKEN"];
 const appSlug = getInput("app-slug");
 const upstreamRepo = github.context.repo;
 const upstreamPr = parseInt(getInput("upstream-pr"), 10);
@@ -41,7 +56,8 @@ const downstreamBranch = getInput("downstream-branch");
 const downstreamLabel = getInput("downstream-label");
 const downstreamLabelMerge = getInput("downstream-label-merge");
 const overrideToolchain = getInputOpt("override-toolchain");
-const octo = github.getOctokit(appToken);
+const upstreamOcto = github.getOctokit(upstreamToken);
+const downstreamOcto = github.getOctokit(downstreamToken);
 
 async function dRun(
   cmd: string,
@@ -87,7 +103,7 @@ async function updateStatus(
 ): Promise<void> {
   core.info(`Updating status message on #${uPr.number}...`);
   await postOrUpdateStatus({
-    octo: octo,
+    octo: upstreamOcto,
     appSlug: appSlug,
     repo: upstreamRepo,
     issueNumber: uPr.number,
@@ -97,6 +113,7 @@ async function updateStatus(
 }
 
 async function getBranch(
+  octo: Octokit,
   repo: Repo,
   branch: string,
 ): Promise<Branch | undefined> {
@@ -115,13 +132,13 @@ async function getBranch(
 }
 
 async function ensureCorrectMergeBase(prefix: string, uPr: Pr): Promise<void> {
-  const uBranch = await getBranch(upstreamRepo, upstreamBranch);
+  const uBranch = await getBranch(upstreamOcto, upstreamRepo, upstreamBranch);
   assert(
     uBranch !== undefined,
     `Upstream branch "${upstreamBranch}" not found`,
   );
 
-  const { data: mergeBase } = await octo.rest.repos.compareCommits({
+  const { data: mergeBase } = await upstreamOcto.rest.repos.compareCommits({
     ...upstreamRepo,
     base: uPr.base.sha,
     head: uPr.head.sha,
@@ -171,8 +188,7 @@ async function switchToAdaptationBranch(
 async function applyOverridesAndCommit(): Promise<void> {
   if (overrideToolchain !== null) {
     core.info(`Applying toolchain override "${overrideToolchain}"...`);
-    const toolchainPath = path.join(downstreamClone, "lean-toolchain");
-    await fs.writeFile(toolchainPath, `${overrideToolchain}\n`);
+    await writeToolchainOverride(downstreamClone, overrideToolchain);
   }
 
   const committed = await addAndCommit(
@@ -182,16 +198,21 @@ async function applyOverridesAndCommit(): Promise<void> {
   if (!committed) return;
 
   core.info("Running downstream updater...");
-  await dRun("python", [".downstream/update.py", ".", "--fixup-all"]);
+  await runUpdater(downstreamClone);
 }
 
 async function pushAdaptationBranch(aBranchName: string): Promise<void> {
-  await dRun("git", ["push", "-u", "origin", aBranchName]);
+  await pushBranch(
+    downstreamClone,
+    downstreamRepo,
+    aBranchName,
+    downstreamToken,
+  );
 }
 
 async function getDownstreamDefaultBranch(): Promise<string> {
   core.info("Fetching downstream default branch...");
-  const { data } = await octo.rest.repos.get({ ...downstreamRepo });
+  const { data } = await downstreamOcto.rest.repos.get({ ...downstreamRepo });
   core.info(`Downstream default branch is "${data.default_branch}"`);
   return data.default_branch;
 }
@@ -203,14 +224,14 @@ async function syncState(uPr: Pr, aPr: ListPr): Promise<void> {
 
   if (uPr.state === "open" && aPr.state !== "open") {
     core.info(`Reopening adaptation PR #${aPr.number}...`);
-    await octo.rest.pulls.update({
+    await downstreamOcto.rest.pulls.update({
       ...downstreamRepo,
       pull_number: aPr.number,
       state: "open",
     });
   } else if (uPr.state !== "open" && aPr.state === "open") {
     core.info(`Closing adaptation PR #${aPr.number}...`);
-    await octo.rest.pulls.update({
+    await downstreamOcto.rest.pulls.update({
       ...downstreamRepo,
       pull_number: aPr.number,
       state: "closed",
@@ -221,7 +242,7 @@ async function syncState(uPr: Pr, aPr: ListPr): Promise<void> {
   if (uPr.state !== "open") return;
 
   if (uPr.draft && !aPr.draft) {
-    await octo.graphql(
+    await downstreamOcto.graphql(
       `mutation($id: ID!) {
         convertPullRequestToDraft(input: { pullRequestId: $id }) {
           clientMutationId
@@ -230,7 +251,7 @@ async function syncState(uPr: Pr, aPr: ListPr): Promise<void> {
       { id: aPr.node_id },
     );
   } else if (!uPr.draft && aPr.draft) {
-    await octo.graphql(
+    await downstreamOcto.graphql(
       `mutation($id: ID!) {
         markPullRequestReadyForReview(input: { pullRequestId: $id }) {
           clientMutationId
@@ -248,7 +269,7 @@ async function createAdaptationPrFor(
   core.info("Creating adaptation PR...");
   const defaultBranch = await getDownstreamDefaultBranch();
   const uPrRef = `${upstreamRepo.owner}/${upstreamRepo.repo}#${uPr.number}`;
-  const { data } = await octo.rest.pulls.create({
+  const { data } = await downstreamOcto.rest.pulls.create({
     ...downstreamRepo,
     base: defaultBranch,
     head: aBranchName,
@@ -259,7 +280,7 @@ async function createAdaptationPrFor(
   core.info(`Created adaptation PR #${data.number}`);
 
   core.info(`Adding label "${downstreamLabel}" to adaptation PR...`);
-  await octo.rest.issues.addLabels({
+  await downstreamOcto.rest.issues.addLabels({
     ...downstreamRepo,
     issue_number: data.number,
     labels: [downstreamLabel],
@@ -269,14 +290,14 @@ async function createAdaptationPrFor(
 }
 
 async function run(): Promise<void> {
-  const uPr = await getPr(octo, upstreamRepo, upstreamPr);
+  const uPr = await getPr(upstreamOcto, upstreamRepo, upstreamPr);
 
   ensurePrIsUnmerged(uPr);
   ensurePrIsLabeled(uPr, upstreamLabel);
   ensurePrTargetsDefaultBranch(uPr);
 
   const aBranchName = adaptationBranchNameFor(uPr);
-  const aBranch = await getBranch(downstreamRepo, aBranchName);
+  const aBranch = await getBranch(downstreamOcto, downstreamRepo, aBranchName);
 
   // If there's no adaptation branch, then there can't be any open adaptation
   // PR, and instead of attempting to re-use any existing closed adaptation PRs,
@@ -284,7 +305,7 @@ async function run(): Promise<void> {
   const aPr =
     aBranch === undefined
       ? undefined
-      : await findPrFor(octo, downstreamRepo, aBranchName);
+      : await findPrFor(downstreamOcto, downstreamRepo, aBranchName);
 
   const prefix = statusPrefix(aPr?.number);
 

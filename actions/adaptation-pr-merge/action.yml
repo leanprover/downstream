@@ -2,8 +2,15 @@ name: Merge zero or more adaptation PRs
 
 inputs:
   app-token:
-    description: GitHub app token.
-    required: true
+    description: >
+      GitHub app token to use for both repositories when repository-specific
+      tokens are not provided.
+
+  upstream-token:
+    description: GitHub app token scoped to the upstream repository.
+
+  downstream-token:
+    description: GitHub app token scoped to the downstream repository.
 
   app-slug:
     description: GitHub app slug.

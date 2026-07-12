@@ -5,7 +5,7 @@ import tomllib
 from collections.abc import Generator
 from dataclasses import dataclass
 from os import PathLike
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from subprocess import CompletedProcess
 
 type Arg = str | bytes | PathLike[str] | PathLike[bytes]
@@ -69,6 +69,13 @@ class Subrepo:
 
 def load_subrepos(path: Path) -> Generator[Subrepo]:
     for name, data in tomllib.loads(path.read_text()).items():
+        if (
+            not name
+            or name.startswith((".", "-"))
+            or PurePosixPath(name).name != name
+            or PureWindowsPath(name).name != name
+        ):
+            raise ValueError(f"invalid subrepo name: {name!r}")
         url = data["url"]
         fetch_url = data.get("fetch_url", url)
         push_url = data.get("push_url", url)

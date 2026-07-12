@@ -4,10 +4,12 @@ import * as github from "@actions/github";
 
 import { RequestError } from "@octokit/request-error";
 import { postOrUpdateStatus } from "../lib/status-message";
+import { pushBranch, runUpdater } from "../lib/security";
 import {
   abort,
   addAndCommit,
   getInput,
+  getInputOpt,
   getPr,
   type ListPr,
   parseRepo,
@@ -16,7 +18,20 @@ import {
   upstreamPrNumberFor,
 } from "../lib/util";
 
-const appToken = getInput("app-token");
+const appToken = getInputOpt("app-token");
+const upstreamToken =
+  getInputOpt("upstream-token") ??
+  appToken ??
+  abort("upstream-token or app-token is required");
+const downstreamToken =
+  getInputOpt("downstream-token") ??
+  appToken ??
+  abort("downstream-token or app-token is required");
+core.setSecret(upstreamToken);
+core.setSecret(downstreamToken);
+delete process.env["INPUT_APP-TOKEN"];
+delete process.env["INPUT_UPSTREAM-TOKEN"];
+delete process.env["INPUT_DOWNSTREAM-TOKEN"];
 const appSlug = getInput("app-slug");
 const upstreamRepo = parseRepo(getInput("upstream-repo"));
 const upstreamRev = getInput("upstream-rev");
@@ -24,7 +39,8 @@ const downstreamRepo = github.context.repo;
 const downstreamClone = getInput("downstream-clone");
 const downstreamLabel = getInput("downstream-label");
 const downstreamLabelMerge = getInput("downstream-label-merge");
-const octo = github.getOctokit(appToken);
+const upstreamOcto = github.getOctokit(upstreamToken);
+const downstreamOcto = github.getOctokit(downstreamToken);
 
 async function dRun(
   cmd: string,
@@ -67,11 +83,16 @@ async function undoOverridesAndCommit(aPr: ListPr): Promise<void> {
   if (!committed) return;
 
   core.info("Running downstream updater...");
-  await dRun("python", [".downstream/update.py", ".", "--fixup-all"]);
+  await runUpdater(downstreamClone);
 }
 
 async function pushAdaptationBranch(aBranchName: string): Promise<void> {
-  await dRun("git", ["push", "-u", "origin", aBranchName]);
+  await pushBranch(
+    downstreamClone,
+    downstreamRepo,
+    aBranchName,
+    downstreamToken,
+  );
 }
 
 // After pushing to the adaptation branch, GitHub resets the PR's `mergeable`
@@ -81,7 +102,7 @@ async function waitForMergeability(prNumber: number): Promise<void> {
   const attempts = 10;
   const delayMs = 3000;
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const pr = await getPr(octo, downstreamRepo, prNumber);
+    const pr = await getPr(downstreamOcto, downstreamRepo, prNumber);
     if (pr.mergeable !== null) return;
     core.info(
       `Mergeability of adaptation PR #${prNumber} unknown,` +
@@ -94,7 +115,7 @@ async function waitForMergeability(prNumber: number): Promise<void> {
 
 async function squashMergeAdaptationPr(aPr: ListPr): Promise<boolean> {
   try {
-    await octo.rest.pulls.merge({
+    await downstreamOcto.rest.pulls.merge({
       ...downstreamRepo,
       pull_number: aPr.number,
       merge_method: "squash",
@@ -119,7 +140,7 @@ async function tellAuthorToMerge(uPr: Pr, aPr: ListPr): Promise<void> {
     `and merge this PR manually.`;
 
   await postOrUpdateStatus({
-    octo,
+    octo: downstreamOcto,
     appSlug,
     repo: downstreamRepo,
     issueNumber: aPr.number,
@@ -131,7 +152,7 @@ async function addMergeLabel(aPr: ListPr): Promise<void> {
   core.info(
     `Adding label "${downstreamLabelMerge}" to adaptation PR #${aPr.number}...`,
   );
-  await octo.rest.issues.addLabels({
+  await downstreamOcto.rest.issues.addLabels({
     ...downstreamRepo,
     issue_number: aPr.number,
     labels: [downstreamLabelMerge],
@@ -139,7 +160,7 @@ async function addMergeLabel(aPr: ListPr): Promise<void> {
 }
 
 async function findAdaptationPrMergeCandidates(): Promise<ListPr[]> {
-  const prs = await octo.paginate(octo.rest.pulls.list, {
+  const prs = await downstreamOcto.paginate(downstreamOcto.rest.pulls.list, {
     ...downstreamRepo,
     state: "open",
     sort: "created",
@@ -156,7 +177,7 @@ async function findAdaptationPrMergeCandidates(): Promise<ListPr[]> {
 
 async function isReachableFromRev(uPr: Pr): Promise<boolean> {
   if (!uPr.merged || uPr.merge_commit_sha === null) return false;
-  const { data } = await octo.rest.repos.compareCommitsWithBasehead({
+  const { data } = await upstreamOcto.rest.repos.compareCommitsWithBasehead({
     ...upstreamRepo,
     basehead: `${uPr.merge_commit_sha}...${upstreamRev}`,
   });
@@ -176,7 +197,7 @@ async function mergeForPr(aPr: ListPr): Promise<void> {
     );
     return;
   }
-  const uPr = await getPr(octo, upstreamRepo, uPrNumber);
+  const uPr = await getPr(upstreamOcto, upstreamRepo, uPrNumber);
 
   // Only merge once the upstream PR has landed in the upstream revision
   if (!(await isReachableFromRev(uPr))) {
