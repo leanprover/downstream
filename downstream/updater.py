@@ -222,13 +222,7 @@ class Updater:
         self.fetch_sha_tree(subrepo.fetch_url, base_sha)
 
         run("git", "switch", "-C", branch, base_sha)
-        self.restore_tree_to(our_tree, Path())
-
-        run(
-            *("git", "restore", "--worktree"),
-            f"--source={our_tree}",
-            ".",
-        )
+        run("git", "read-tree", "--reset", "-u", our_tree)
 
         # Remove our overrides
         for file in Path().glob("**/.lake/package-overrides.json"):
