@@ -214,7 +214,9 @@ class Updater:
             if path.name not in self.subrepos_by_name:
                 self.remove_subrepo(path)
 
-    def split_to_branch(self, subrepo: Subrepo, branch: str) -> None:
+    def split_to_branch(
+        self, subrepo: Subrepo, branch: str, message: str = "chore: nightly adaptations"
+    ) -> None:
         self.reset()
 
         our_tree = self.get_tree_in_head(subrepo.name)
@@ -238,4 +240,4 @@ class Updater:
         )
 
         run("git", "add", ".")
-        self.commit("chore: nightly adaptations")
+        self.commit(message)
