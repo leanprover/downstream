@@ -16,11 +16,15 @@ class Updater:
 
         self.overrides = [r for r in subrepos if r.override_only]
         self.overrides_by_name = {r.name: r for r in self.overrides}
-        self.overrides_by_url = {url: r for r in self.overrides for url in (r.url, r.fetch_url)}
+        self.overrides_by_url = {
+            url: r for r in self.overrides for url in (r.url, r.fetch_url)
+        }
 
         self.subrepos = [r for r in subrepos if not r.override_only]
         self.subrepos_by_name = {r.name: r for r in self.subrepos}
-        self.subrepos_by_url = {url: r for r in self.subrepos for url in (r.url, r.fetch_url)}
+        self.subrepos_by_url = {
+            url: r for r in self.subrepos for url in (r.url, r.fetch_url)
+        }
 
     def dep_graph(self, external: bool = False) -> dict[str, set[str]]:
         graph: dict[str, set[str]] = {}
