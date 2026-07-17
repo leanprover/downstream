@@ -24208,9 +24208,7 @@ function renderReport(report, reportType2, reportStyle2) {
   const commitUrl = `${repoUrl}/commit/${report.commit_sha}`;
   const runUrl = `${repoUrl}/actions/runs/${runId}/attempts/${runAttempt}`;
   const lines = [
-    "# Build Report",
-    "",
-    `For commit **[${report.commit_message}](${commitUrl})**`,
+    `### Build report for *[${report.commit_message}](${commitUrl})*`,
     "",
     ...renderBody(report, reportType2, reportStyle2),
     "",

@@ -123,9 +123,7 @@ function renderReport(
   const runUrl = `${repoUrl}/actions/runs/${runId}/attempts/${runAttempt}`;
 
   const lines: string[] = [
-    "# Build Report",
-    "",
-    `For commit **[${report.commit_message}](${commitUrl})**`,
+    `### Build report for *[${report.commit_message}](${commitUrl})*`,
     "",
     ...renderBody(report, reportType, reportStyle),
     "",
