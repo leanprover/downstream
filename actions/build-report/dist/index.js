@@ -24144,14 +24144,63 @@ function getInputOpt(name) {
 
 // actions/build-report/main.ts
 var reportPath = getInput2("report-path");
+var reportType = parseReportType(getInput2("report-type"));
+var reportStyle = parseReportStyle(getInput2("report-style"));
 var runId = getInputOpt("run-id") ?? String(context2.runId);
 var runAttempt = getInputOpt("run-attempt") ?? String(context2.runAttempt);
 var outputPath = getInputOpt("output-path");
+function parseReportType(value) {
+  if (value === "full" || value === "compact") return value;
+  abort(`Invalid report-type "${value}", expected "full" or "compact"`);
+}
+function parseReportStyle(value) {
+  if (value === "github" || value === "zulip") return value;
+  abort(`Invalid report-style "${value}", expected "github" or "zulip"`);
+}
 function statusIcon(phase) {
   if (phase.success === null) return "\u23ED\uFE0F";
   return phase.success ? "\u2705" : "\u{1F7E5}";
 }
-function renderReport(report) {
+function renderTable(repos) {
+  const lines = [
+    "| Repo | Critical | Build | Test | Lint |",
+    "|------|----------|-------|------|------|"
+  ];
+  for (const repo of repos) {
+    const critical = repo.critical ? "\u2705" : "";
+    const build = statusIcon(repo.build);
+    const test = statusIcon(repo.test);
+    const lint = statusIcon(repo.lint);
+    lines.push(`| ${repo.name} | ${critical} | ${build} | ${test} | ${lint} |`);
+  }
+  return lines;
+}
+function renderSpoiler(style, summary2, contentLines) {
+  if (style === "zulip")
+    return [`\`\`\`spoiler ${summary2}`, ...contentLines, "```"];
+  return [
+    "<details>",
+    `<summary>${summary2}</summary>`,
+    "",
+    ...contentLines,
+    "",
+    "</details>"
+  ];
+}
+function renderBody(report, reportType2, reportStyle2) {
+  if (reportType2 === "full") return renderTable(report.repos);
+  const redRepos = report.repos.filter((repo) => !repo.green);
+  const greenRepos = report.repos.filter((repo) => repo.green);
+  const lines = redRepos.length === 0 ? ["All green! :)"] : renderTable(redRepos);
+  if (greenRepos.length > 0) {
+    lines.push(
+      "",
+      ...renderSpoiler(reportStyle2, "Green repos", renderTable(greenRepos))
+    );
+  }
+  return lines;
+}
+function renderReport(report, reportType2, reportStyle2) {
   const { context: context3 } = github_exports;
   const repoUrl = `${context3.serverUrl}/${context3.repo.owner}/${context3.repo.repo}`;
   const commitUrl = `${repoUrl}/commit/${report.commit_sha}`;
@@ -24161,22 +24210,16 @@ function renderReport(report) {
     "",
     `For commit **[${report.commit_message}](${commitUrl})**`,
     "",
-    "| Repo | Critical | Build | Test | Lint |",
-    "|------|----------|-------|------|------|"
+    ...renderBody(report, reportType2, reportStyle2),
+    "",
+    `[View run](${runUrl})`
   ];
-  for (const repo of report.repos) {
-    const critical = repo.critical ? "\u2705" : "";
-    lines.push(
-      `| ${repo.name} | ${critical} | ${statusIcon(repo.build)} | ${statusIcon(repo.test)} | ${statusIcon(repo.lint)} |`
-    );
-  }
-  lines.push("", `[View run](${runUrl})`);
   return lines.join("\n") + "\n";
 }
 async function run() {
   const raw = await fs3.readFile(reportPath, "utf8");
   const reportData = JSON.parse(raw);
-  const report = renderReport(reportData);
+  const report = renderReport(reportData, reportType, reportStyle);
   setOutput("report", report);
   if (outputPath !== null) await fs3.writeFile(outputPath, report);
 }
