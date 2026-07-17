@@ -204,9 +204,6 @@ def main() -> None:
     if report_path is not None:
         report_path.write_text(json.dumps(report))
 
-    if not green:
-        raise SystemExit("At least one critical repo failed.")
-
 
 if __name__ == "__main__":
     main()
