@@ -47,9 +47,11 @@ interface Report {
   repos: Repo[];
 }
 
-function statusIcon(phase: Phase): string {
+function status(phase: Phase): string {
   if (phase.success === null) return "⏭️";
-  return phase.success ? "✅" : "🟥";
+  const icon = phase.success ? "✅" : "🟥";
+  if (phase.duration === null) return icon;
+  return `${icon} in ${Math.round(phase.duration / 60)}m`;
 }
 
 function renderTable(repos: Repo[]): string[] {
@@ -60,9 +62,9 @@ function renderTable(repos: Repo[]): string[] {
 
   for (const repo of repos) {
     const critical = repo.critical ? "✅" : "";
-    const build = statusIcon(repo.build);
-    const test = statusIcon(repo.test);
-    const lint = statusIcon(repo.lint);
+    const build = status(repo.build);
+    const test = status(repo.test);
+    const lint = status(repo.lint);
     lines.push(`| ${repo.name} | ${critical} | ${build} | ${test} | ${lint} |`);
   }
 
