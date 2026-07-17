@@ -24218,10 +24218,10 @@ function renderReport(report, reportType2, reportStyle2) {
 }
 async function run() {
   const raw = await fs3.readFile(reportPath, "utf8");
-  const reportData = JSON.parse(raw);
-  const report = renderReport(reportData, reportType, reportStyle);
-  setOutput("report", report);
-  if (outputPath !== null) await fs3.writeFile(outputPath, report);
+  const report = JSON.parse(raw);
+  const rendered = renderReport(report, reportType, reportStyle);
+  setOutput("report", rendered);
+  if (outputPath !== null) await fs3.writeFile(outputPath, rendered);
 }
 run().catch((error2) => {
   abort(error2 instanceof Error ? error2.message : String(error2));

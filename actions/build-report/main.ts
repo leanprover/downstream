@@ -3,6 +3,11 @@ import * as fs from "node:fs/promises";
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 
+import type {
+  BuildReport,
+  BuildReportPhase,
+  BuildReportRepo,
+} from "../lib/reports";
 import { abort, getInput, getInputOpt } from "../lib/util";
 
 const reportPath = getInput("report-path");
@@ -26,35 +31,14 @@ function parseReportStyle(value: string): ReportStyle {
   abort(`Invalid report-style "${value}", expected "github" or "zulip"`);
 }
 
-interface Phase {
-  success: boolean | null; // null == skipped
-  duration: number | null;
-}
-
-interface Repo {
-  name: string;
-  critical: boolean;
-  green: boolean;
-  build: Phase;
-  test: Phase;
-  lint: Phase;
-}
-
-interface Report {
-  commit_sha: string;
-  commit_message: string;
-  green: boolean;
-  repos: Repo[];
-}
-
-function status(phase: Phase): string {
+function status(phase: BuildReportPhase): string {
   if (phase.success === null) return "⏭️";
   const icon = phase.success ? "✅" : "🟥";
   if (phase.duration === null) return icon;
   return `${icon} in ${Math.round(phase.duration / 60)}m`;
 }
 
-function renderTable(repos: Repo[]): string[] {
+function renderTable(repos: BuildReportRepo[]): string[] {
   const lines = [
     "| Repo | Critical | Build | Test | Lint |",
     "|------|----------|-------|------|------|",
@@ -90,7 +74,7 @@ function renderSpoiler(
 }
 
 function renderBody(
-  report: Report,
+  report: BuildReport,
   reportType: ReportType,
   reportStyle: ReportStyle,
 ): string[] {
@@ -113,7 +97,7 @@ function renderBody(
 }
 
 function renderReport(
-  report: Report,
+  report: BuildReport,
   reportType: ReportType,
   reportStyle: ReportStyle,
 ): string {
@@ -135,11 +119,11 @@ function renderReport(
 
 async function run(): Promise<void> {
   const raw = await fs.readFile(reportPath, "utf8");
-  const reportData = JSON.parse(raw) as Report;
-  const report = renderReport(reportData, reportType, reportStyle);
+  const report = JSON.parse(raw) as BuildReport;
+  const rendered = renderReport(report, reportType, reportStyle);
 
-  core.setOutput("report", report);
-  if (outputPath !== null) await fs.writeFile(outputPath, report);
+  core.setOutput("report", rendered);
+  if (outputPath !== null) await fs.writeFile(outputPath, rendered);
 }
 
 run().catch((error) => {
