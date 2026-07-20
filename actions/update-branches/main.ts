@@ -4,13 +4,14 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 
 import type { BranchReport, BuildReport } from "../lib/reports";
-import { abort, getInput, parseBool } from "../lib/util";
+import { abort, getInput, getInputOpt, parseBool } from "../lib/util";
 
 const reportPath = getInput("report-path");
 const downstreamClone = getInput("downstream-clone");
 const byRepo = parseBool(getInput("by-repo"));
 const byDate = parseBool(getInput("by-date"));
 const byToolchain = parseBool(getInput("by-toolchain"));
+const outputPath = getInputOpt("output-path");
 
 const REMOTE = "origin";
 const TOOLCHAIN_PREFIX = "leanprover/lean4:";
@@ -122,7 +123,9 @@ async function run(): Promise<void> {
     by_repo: prevByRepo,
   };
 
-  core.setOutput("report", JSON.stringify(branchReport));
+  const stringified = JSON.stringify(branchReport);
+  core.setOutput("report", stringified);
+  if (outputPath !== null) await fs.writeFile(outputPath, stringified);
 
   /////////////////////
   // Update branches //

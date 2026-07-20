@@ -34,6 +34,9 @@ inputs:
       toolchain name.
     default: false
 
+  output-path:
+    description: If given, also write the branch report to this path.
+
 outputs:
   report:
     description: Branch status report, in JSON.

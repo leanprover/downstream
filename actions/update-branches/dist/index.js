@@ -19951,6 +19951,10 @@ function abort(reason) {
 function getInput2(name) {
   return getInput(name, { required: true });
 }
+function getInputOpt(name) {
+  const value = getInput(name, { required: false });
+  return value === "" ? null : value;
+}
 function parseBool(input) {
   return input.trim().toLowerCase() === "true";
 }
@@ -19961,6 +19965,7 @@ var downstreamClone = getInput2("downstream-clone");
 var byRepo = parseBool(getInput2("by-repo"));
 var byDate = parseBool(getInput2("by-date"));
 var byToolchain = parseBool(getInput2("by-toolchain"));
+var outputPath = getInputOpt("output-path");
 var REMOTE = "origin";
 var TOOLCHAIN_PREFIX = "leanprover/lean4:";
 async function dRun(cmd, args, options) {
@@ -20032,7 +20037,9 @@ async function run() {
     critical: prevCritical,
     by_repo: prevByRepo
   };
-  setOutput("report", JSON.stringify(branchReport));
+  const stringified = JSON.stringify(branchReport);
+  setOutput("report", stringified);
+  if (outputPath !== null) await fs3.writeFile(outputPath, stringified);
   let ok = true;
   ok &&= await updateStatus(
     "green",

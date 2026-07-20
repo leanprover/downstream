@@ -40,11 +40,11 @@ inputs:
       run's attempt; see `run-id` for when to override it.
 
   output-path:
-    description: If given, also write the markdown build report to this path.
+    description: If given, also write the markdown report to this path.
 
 outputs:
   report:
-    description: The markdown build report.
+    description: The markdown report.
 
 runs:
   using: node24
