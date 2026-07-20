@@ -4,26 +4,31 @@ import * as core from "@actions/core";
 import * as github from "@actions/github";
 
 import type {
+  BranchReport,
   BuildReport,
   BuildReportPhase,
   BuildReportRepo,
 } from "../lib/reports";
-import { abort, getInput, getInputOpt } from "../lib/util";
+import { abort, assert, getInput, getInputOpt } from "../lib/util";
 
 const reportPath = getInput("report-path");
 const reportType = parseReportType(getInput("report-type"));
 const reportStyle = parseReportStyle(getInput("report-style"));
+const branchReportPath = getInputOpt("branch-report-path");
 const runId = getInputOpt("run-id") ?? String(github.context.runId);
 const runAttempt =
   getInputOpt("run-attempt") ?? String(github.context.runAttempt);
 const outputPath = getInputOpt("output-path");
 
-type ReportType = "full" | "compact";
+type ReportType = "full" | "compact" | "delta";
 type ReportStyle = "github" | "zulip";
 
 function parseReportType(value: string): ReportType {
-  if (value === "full" || value === "compact") return value;
-  abort(`Invalid report-type "${value}", expected "full" or "compact"`);
+  if (value === "full" || value === "compact" || value === "delta")
+    return value;
+  abort(
+    `Invalid report-type "${value}", expected "full", "compact", or "delta"`,
+  );
 }
 
 function parseReportStyle(value: string): ReportStyle {
@@ -73,13 +78,10 @@ function renderSpoiler(
   ];
 }
 
-function renderBody(
+function renderCompact(
   report: BuildReport,
-  reportType: ReportType,
   reportStyle: ReportStyle,
 ): string[] {
-  if (reportType === "full") return renderTable(report.repos);
-
   const redRepos = report.repos.filter((repo) => !repo.green);
   const greenRepos = report.repos.filter((repo) => repo.green);
 
@@ -96,11 +98,55 @@ function renderBody(
   return lines;
 }
 
-function renderReport(
+// `branchReport.by_repo` holds each repo's color *before* this build, so
+// comparing it against `report.repos[].green` (the color *after*) tells us
+// which repos flipped.
+function renderDelta(
+  report: BuildReport,
+  branchReport: BranchReport,
+): string[] {
+  const turnedRed: BuildReportRepo[] = [];
+  const turnedGreen: BuildReportRepo[] = [];
+
+  for (const repo of report.repos) {
+    const wasGreen = branchReport.by_repo[repo.name];
+    if (wasGreen === true && !repo.green) turnedRed.push(repo);
+    else if (wasGreen === false && repo.green) turnedGreen.push(repo);
+  }
+
+  const lines: string[] = [];
+
+  if (turnedRed.length > 0) {
+    lines.push("**Recently turned red:**", "", ...renderTable(turnedRed));
+  }
+
+  if (turnedGreen.length > 0) {
+    if (lines.length > 0) lines.push("");
+    lines.push("**Recently turned green:**", "", ...renderTable(turnedGreen));
+  }
+
+  return lines;
+}
+
+async function renderBody(
   report: BuildReport,
   reportType: ReportType,
   reportStyle: ReportStyle,
-): string {
+  branchReportPath: string | null,
+): Promise<string[]> {
+  if (reportType === "full") return renderTable(report.repos);
+  if (reportType === "compact") return renderCompact(report, reportStyle);
+
+  if (branchReportPath === null)
+    abort('`branch-report-path` is required when report-type is "delta"');
+  const branchRaw = await fs.readFile(branchReportPath, "utf8");
+  const branchReport = JSON.parse(branchRaw) as BranchReport;
+  return renderDelta(report, branchReport);
+}
+
+function renderReport(report: BuildReport, bodyLines: string[]): string {
+  assert(bodyLines.length > 0, "Report must not be empty");
+
   const { context } = github;
   const repoUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}`;
   const commitUrl = `${repoUrl}/commit/${report.commit_sha}`;
@@ -109,7 +155,7 @@ function renderReport(
   const lines: string[] = [
     `### Build report for *[${report.commit_message}](${commitUrl})*`,
     "",
-    ...renderBody(report, reportType, reportStyle),
+    ...bodyLines,
     "",
     `[View run](${runUrl})`,
   ];
@@ -120,7 +166,11 @@ function renderReport(
 async function run(): Promise<void> {
   const raw = await fs.readFile(reportPath, "utf8");
   const report = JSON.parse(raw) as BuildReport;
-  const rendered = renderReport(report, reportType, reportStyle);
+
+  const rendered = renderReport(
+    report,
+    await renderBody(report, reportType, reportStyle, branchReportPath),
+  );
 
   core.setOutput("report", rendered);
   if (outputPath !== null) await fs.writeFile(outputPath, rendered);
