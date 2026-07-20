@@ -24146,10 +24146,10 @@ function getInputOpt(name) {
 }
 
 // actions/render-report/main.ts
-var reportPath = getInput2("report-path");
+var buildReportPath = getInput2("build-report-path");
+var branchReportPath = getInputOpt("branch-report-path");
 var reportType = parseReportType(getInput2("report-type"));
 var reportStyle = parseReportStyle(getInput2("report-style"));
-var branchReportPath = getInputOpt("branch-report-path");
 var runId = getInputOpt("run-id") ?? String(context2.runId);
 var runAttempt = getInputOpt("run-attempt") ?? String(context2.runAttempt);
 var outputPath = getInputOpt("output-path");
@@ -24226,14 +24226,19 @@ function renderDelta(report, branchReport) {
   }
   return lines;
 }
-async function renderBody(report, reportType2, reportStyle2, branchReportPath2) {
-  if (reportType2 === "full") return renderTable(report.repos);
-  if (reportType2 === "compact") return renderCompact(report, reportStyle2);
-  if (branchReportPath2 === null)
-    abort('`branch-report-path` is required when report-type is "delta"');
-  const branchRaw = await fs3.readFile(branchReportPath2, "utf8");
-  const branchReport = JSON.parse(branchRaw);
-  return renderDelta(report, branchReport);
+async function renderBody(buildReport, branchReport, reportType2, reportStyle2) {
+  switch (reportType2) {
+    case "full":
+      return renderTable(buildReport.repos);
+    case "compact":
+      return renderCompact(buildReport, reportStyle2);
+    case "delta":
+      assert(
+        branchReport !== null,
+        'branch report is required for "delta" report type'
+      );
+      return renderDelta(buildReport, branchReport);
+  }
 }
 function renderReport(report, bodyLines) {
   assert(bodyLines.length > 0, "Report must not be empty");
@@ -24250,13 +24255,20 @@ function renderReport(report, bodyLines) {
   ];
   return lines.join("\n") + "\n";
 }
+async function loadReport(path) {
+  const raw = await fs3.readFile(path, "utf8");
+  return JSON.parse(raw);
+}
 async function run() {
-  const raw = await fs3.readFile(reportPath, "utf8");
-  const report = JSON.parse(raw);
-  const rendered = renderReport(
-    report,
-    await renderBody(report, reportType, reportStyle, branchReportPath)
+  const buildReport = await loadReport(buildReportPath);
+  const branchReport = branchReportPath ? await loadReport(branchReportPath) : null;
+  const lines = await renderBody(
+    buildReport,
+    branchReport,
+    reportType,
+    reportStyle
   );
+  const rendered = renderReport(buildReport, lines);
   setOutput("report", rendered);
   if (outputPath !== null) await fs3.writeFile(outputPath, rendered);
 }

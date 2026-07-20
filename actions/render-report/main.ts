@@ -11,10 +11,10 @@ import type {
 } from "../lib/reports";
 import { abort, assert, getInput, getInputOpt } from "../lib/util";
 
-const reportPath = getInput("report-path");
+const buildReportPath = getInput("build-report-path");
+const branchReportPath = getInputOpt("branch-report-path");
 const reportType = parseReportType(getInput("report-type"));
 const reportStyle = parseReportStyle(getInput("report-style"));
-const branchReportPath = getInputOpt("branch-report-path");
 const runId = getInputOpt("run-id") ?? String(github.context.runId);
 const runAttempt =
   getInputOpt("run-attempt") ?? String(github.context.runAttempt);
@@ -129,19 +129,23 @@ function renderDelta(
 }
 
 async function renderBody(
-  report: BuildReport,
+  buildReport: BuildReport,
+  branchReport: BranchReport | null,
   reportType: ReportType,
   reportStyle: ReportStyle,
-  branchReportPath: string | null,
 ): Promise<string[]> {
-  if (reportType === "full") return renderTable(report.repos);
-  if (reportType === "compact") return renderCompact(report, reportStyle);
-
-  if (branchReportPath === null)
-    abort('`branch-report-path` is required when report-type is "delta"');
-  const branchRaw = await fs.readFile(branchReportPath, "utf8");
-  const branchReport = JSON.parse(branchRaw) as BranchReport;
-  return renderDelta(report, branchReport);
+  switch (reportType) {
+    case "full":
+      return renderTable(buildReport.repos);
+    case "compact":
+      return renderCompact(buildReport, reportStyle);
+    case "delta":
+      assert(
+        branchReport !== null,
+        'branch report is required for "delta" report type',
+      );
+      return renderDelta(buildReport, branchReport);
+  }
 }
 
 function renderReport(report: BuildReport, bodyLines: string[]): string {
@@ -163,14 +167,24 @@ function renderReport(report: BuildReport, bodyLines: string[]): string {
   return lines.join("\n") + "\n";
 }
 
-async function run(): Promise<void> {
-  const raw = await fs.readFile(reportPath, "utf8");
-  const report = JSON.parse(raw) as BuildReport;
+async function loadReport<T>(path: string): Promise<T> {
+  const raw = await fs.readFile(path, "utf8");
+  return JSON.parse(raw) as T;
+}
 
-  const rendered = renderReport(
-    report,
-    await renderBody(report, reportType, reportStyle, branchReportPath),
+async function run(): Promise<void> {
+  const buildReport = await loadReport<BuildReport>(buildReportPath);
+  const branchReport = branchReportPath
+    ? await loadReport<BranchReport>(branchReportPath)
+    : null;
+
+  const lines = await renderBody(
+    buildReport,
+    branchReport,
+    reportType,
+    reportStyle,
   );
+  const rendered = renderReport(buildReport, lines);
 
   core.setOutput("report", rendered);
   if (outputPath !== null) await fs.writeFile(outputPath, rendered);
