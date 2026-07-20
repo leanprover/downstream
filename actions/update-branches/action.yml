@@ -34,6 +34,23 @@ inputs:
       toolchain name.
     default: false
 
+  first-by-repo:
+    description: >
+      Push a tag `first-green-repo/<repo>` the first time that repo goes green.
+    default: false
+
+  first-by-date:
+    description: >
+      Push a tag `first-green-on/YYYY-MM-DD` the first time the commit's UTC
+      date goes green.
+    default: false
+
+  first-by-toolchain:
+    description: >
+      Push a tag `first-green-tc/<toolchain>` the first time that toolchain goes
+      green. The "leanprover/lean4:" prefix is stripped from the toolchain name.
+    default: false
+
   output-path:
     description: If given, also write the branch report to this path.
 

@@ -11,6 +11,9 @@ const downstreamClone = getInput("downstream-clone");
 const byRepo = parseBool(getInput("by-repo"));
 const byDate = parseBool(getInput("by-date"));
 const byToolchain = parseBool(getInput("by-toolchain"));
+const firstByRepo = parseBool(getInput("first-by-repo"));
+const firstByDate = parseBool(getInput("first-by-date"));
+const firstByToolchain = parseBool(getInput("first-by-toolchain"));
 const outputPath = getInputOpt("output-path");
 
 const REMOTE = "origin";
@@ -100,6 +103,23 @@ async function updateStatus(
   }
 }
 
+async function markFirst(tag: string, commitSha: string): Promise<boolean> {
+  if (await refExists(`refs/tags/${tag}`)) return true;
+  try {
+    await dRun("git", ["push", REMOTE, `${commitSha}:refs/tags/${tag}`]);
+    return true;
+  } catch (error) {
+    core.error(`Failed to create tag "${tag}": ${error}`);
+    return false;
+  }
+}
+
+function toolchainName(toolchain: string): string {
+  return toolchain.startsWith(TOOLCHAIN_PREFIX)
+    ? toolchain.slice(TOOLCHAIN_PREFIX.length)
+    : toolchain;
+}
+
 async function run(): Promise<void> {
   const raw = await fs.readFile(reportPath, "utf8");
   const buildReport = JSON.parse(raw) as BuildReport;
@@ -161,14 +181,41 @@ async function run(): Promise<void> {
   }
 
   if (byToolchain) {
-    const toolchain = buildReport.toolchain.startsWith(TOOLCHAIN_PREFIX)
-      ? buildReport.toolchain.slice(TOOLCHAIN_PREFIX.length)
-      : buildReport.toolchain;
-
+    const toolchain = toolchainName(buildReport.toolchain);
     ok &&= await updateStatus(
       `green-tc/${toolchain}`,
       `red-tc/${toolchain}`,
       buildReport.green,
+      buildReport.commit_sha,
+    );
+  }
+
+  /////////////////
+  // Mark firsts //
+  /////////////////
+
+  if (firstByRepo) {
+    for (const repo of buildReport.repos) {
+      if (repo.green) {
+        ok &&= await markFirst(
+          `first-green-repo/${repo.name}`,
+          buildReport.commit_sha,
+        );
+      }
+    }
+  }
+
+  if (firstByDate && buildReport.green) {
+    ok &&= await markFirst(
+      `first-green-on/${buildReport.commit_date}`,
+      buildReport.commit_sha,
+    );
+  }
+
+  if (firstByToolchain && buildReport.green) {
+    const toolchain = toolchainName(buildReport.toolchain);
+    ok &&= await markFirst(
+      `first-green-tc/${toolchain}`,
       buildReport.commit_sha,
     );
   }
