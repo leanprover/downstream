@@ -25,3 +25,5 @@ export interface BranchReport {
   critical: boolean | null;
   by_repo: Record<string, boolean | null>;
 }
+
+export type StatusReport = Record<string, boolean>;
