@@ -20,6 +20,9 @@ inputs:
       `subrepo/*` statuses before giving up.
     default: "50"
 
+  output-path:
+    description: If given, also write the JSON status report to this path.
+
 outputs:
   statuses:
     description: >

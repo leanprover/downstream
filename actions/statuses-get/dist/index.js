@@ -19648,6 +19648,9 @@ var require_dist = __commonJS({
   }
 });
 
+// actions/statuses-get/main.ts
+var fs3 = __toESM(require("node:fs/promises"));
+
 // node_modules/.pnpm/@actions+core@3.0.1/node_modules/@actions/core/lib/command.js
 var os = __toESM(require("os"), 1);
 
@@ -24126,11 +24129,16 @@ function abort(reason) {
 function getInput2(name) {
   return getInput(name, { required: true });
 }
+function getInputOpt(name) {
+  const value = getInput(name, { required: false });
+  return value === "" ? null : value;
+}
 
 // actions/statuses-get/main.ts
 var appToken = getInput2("app-token");
 var startSha = getInput2("commit-sha");
 var maxCommits = parseInt(getInput2("max-commits"), 10);
+var outputPath = getInputOpt("output-path");
 var octo = getOctokit(appToken);
 var repo = context2.repo;
 var CONTEXT_PREFIX = "subrepo/";
@@ -24158,7 +24166,9 @@ async function run() {
     const statuses = await getSubrepoStatuses(sha);
     if (statuses !== null) {
       info(`Found statuses on "${sha}".`);
-      setOutput("statuses", JSON.stringify(statuses));
+      const stringified = JSON.stringify(statuses);
+      setOutput("statuses", stringified);
+      if (outputPath !== null) await fs3.writeFile(outputPath, stringified);
       return;
     }
     if (commitsChecked === maxCommits) break;

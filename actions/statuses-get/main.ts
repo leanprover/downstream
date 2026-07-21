@@ -1,12 +1,15 @@
+import * as fs from "node:fs/promises";
+
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 
 import type { StatusReport } from "../lib/reports";
-import { abort, getInput } from "../lib/util";
+import { abort, getInput, getInputOpt } from "../lib/util";
 
 const appToken = getInput("app-token");
 const startSha = getInput("commit-sha");
 const maxCommits = parseInt(getInput("max-commits"), 10);
+const outputPath = getInputOpt("output-path");
 
 const octo = github.getOctokit(appToken);
 const repo = github.context.repo;
@@ -42,7 +45,9 @@ async function run(): Promise<void> {
     const statuses = await getSubrepoStatuses(sha);
     if (statuses !== null) {
       core.info(`Found statuses on "${sha}".`);
-      core.setOutput("statuses", JSON.stringify(statuses));
+      const stringified = JSON.stringify(statuses);
+      core.setOutput("statuses", stringified);
+      if (outputPath !== null) await fs.writeFile(outputPath, stringified);
       return;
     }
 
