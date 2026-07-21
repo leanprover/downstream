@@ -8,10 +8,11 @@ import type {
   BuildReportPhase,
   BuildReportRepo,
 } from "../lib/reports";
-import { abort, getInput } from "../lib/util";
+import { abort, getInput, getInputOpt } from "../lib/util";
 
 const appToken = getInput("app-token");
 const reportPath = getInput("report-path");
+const targetUrl = getInputOpt("target-url");
 
 const octo = github.getOctokit(appToken);
 const repo = github.context.repo;
@@ -41,6 +42,7 @@ async function updateStatus(
       state: buildRepo.green ? "success" : "failure",
       context: `subrepo/${buildRepo.name}`,
       description: describeStatus(buildRepo),
+      ...(targetUrl !== null ? { target_url: targetUrl } : {}),
     });
     return true;
   } catch (error) {

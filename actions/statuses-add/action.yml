@@ -12,6 +12,9 @@ inputs:
     description: Path to the JSON build report produced by `build.py --report`.
     required: true
 
+  target-url:
+    description: If given, the URL each status links to (e.g. the workflow run).
+
 runs:
   using: node24
   main: dist/index.js

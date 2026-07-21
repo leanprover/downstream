@@ -24087,10 +24087,15 @@ function abort(reason) {
 function getInput2(name) {
   return getInput(name, { required: true });
 }
+function getInputOpt(name) {
+  const value = getInput(name, { required: false });
+  return value === "" ? null : value;
+}
 
 // actions/statuses-add/main.ts
 var appToken = getInput2("app-token");
 var reportPath = getInput2("report-path");
+var targetUrl = getInputOpt("target-url");
 var octo = getOctokit(appToken);
 var repo = context2.repo;
 function phaseLabel(phase) {
@@ -24112,7 +24117,8 @@ async function updateStatus(commitSha, buildRepo) {
       sha: commitSha,
       state: buildRepo.green ? "success" : "failure",
       context: `subrepo/${buildRepo.name}`,
-      description: describeStatus(buildRepo)
+      description: describeStatus(buildRepo),
+      ...targetUrl !== null ? { target_url: targetUrl } : {}
     });
     return true;
   } catch (error2) {
