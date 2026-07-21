@@ -1,0 +1,17 @@
+name: Update commit statuses
+
+description: >
+  Add per-repo commit statuses of the form `subrepo/<repo>` from a build report.
+
+inputs:
+  app-token:
+    description: GitHub app token.
+    required: true
+
+  report-path:
+    description: Path to the JSON build report produced by `build.py --report`.
+    required: true
+
+runs:
+  using: node24
+  main: dist/index.js
