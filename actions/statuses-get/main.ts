@@ -6,12 +6,12 @@ import * as github from "@actions/github";
 import type { StatusReport } from "../lib/reports";
 import { abort, getInput, getInputOpt } from "../lib/util";
 
-const appToken = getInput("app-token");
+const token = getInput("token");
 const startSha = getInput("commit-sha");
 const maxCommits = parseInt(getInput("max-commits"), 10);
 const outputPath = getInputOpt("output-path");
 
-const octo = github.getOctokit(appToken);
+const octo = github.getOctokit(token);
 const repo = github.context.repo;
 
 const CONTEXT_PREFIX = "subrepo/";

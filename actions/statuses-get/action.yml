@@ -6,9 +6,9 @@ description: >
   `statuses-add` action, and return them.
 
 inputs:
-  app-token:
-    description: GitHub app token.
-    required: true
+  token:
+    description: GitHub token with permission to read commit statuses.
+    default: ${{ github.token }}
 
   commit-sha:
     description: The commit to start looking from.

@@ -10,11 +10,11 @@ import type {
 } from "../lib/reports";
 import { abort, getInput, getInputOpt } from "../lib/util";
 
-const appToken = getInput("app-token");
+const token = getInput("token");
 const reportPath = getInput("report-path");
 const targetUrl = getInputOpt("target-url");
 
-const octo = github.getOctokit(appToken);
+const octo = github.getOctokit(token);
 const repo = github.context.repo;
 
 function phaseLabel(phase: BuildReportPhase): string {

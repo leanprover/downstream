@@ -4085,9 +4085,9 @@ var require_util2 = __commonJS({
       let policy = "";
       if (policyHeader.length > 0) {
         for (let i = policyHeader.length; i !== 0; i--) {
-          const token = policyHeader[i - 1].trim();
-          if (referrerPolicyTokens.has(token)) {
-            policy = token;
+          const token2 = policyHeader[i - 1].trim();
+          if (referrerPolicyTokens.has(token2)) {
+            policy = token2;
             break;
           }
         }
@@ -4320,9 +4320,9 @@ var require_util2 = __commonJS({
     function parseMetadata(metadata) {
       const result = [];
       let empty = true;
-      for (const token of metadata.split(" ")) {
+      for (const token2 of metadata.split(" ")) {
         empty = false;
-        const parsedToken = parseHashWithOptions.exec(token);
+        const parsedToken = parseHashWithOptions.exec(token2);
         if (parsedToken === null || parsedToken.groups === void 0 || parsedToken.groups.algo === void 0) {
           continue;
         }
@@ -20182,13 +20182,13 @@ var __awaiter2 = function(thisArg, _arguments, P, generator) {
     step((generator = generator.apply(thisArg, _arguments || [])).next());
   });
 };
-function getAuthString(token, options) {
-  if (!token && !options.auth) {
+function getAuthString(token2, options) {
+  if (!token2 && !options.auth) {
     throw new Error("Parameter token or opts.auth is required");
-  } else if (token && options.auth) {
+  } else if (token2 && options.auth) {
     throw new Error("Parameters token and opts.auth may not both be specified");
   }
-  return typeof options.auth === "string" ? options.auth : `token ${token}`;
+  return typeof options.auth === "string" ? options.auth : `token ${token2}`;
 }
 function getProxyAgent(destinationUrl) {
   const hc = new httpClient.HttpClient();
@@ -21320,43 +21320,43 @@ var b64url = "(?:[a-zA-Z0-9_-]+)";
 var sep = "\\.";
 var jwtRE = new RegExp(`^${b64url}${sep}${b64url}${sep}${b64url}$`);
 var isJWT = jwtRE.test.bind(jwtRE);
-async function auth(token) {
-  const isApp = isJWT(token);
-  const isInstallation = token.startsWith("v1.") || token.startsWith("ghs_");
-  const isUserToServer = token.startsWith("ghu_");
+async function auth(token2) {
+  const isApp = isJWT(token2);
+  const isInstallation = token2.startsWith("v1.") || token2.startsWith("ghs_");
+  const isUserToServer = token2.startsWith("ghu_");
   const tokenType = isApp ? "app" : isInstallation ? "installation" : isUserToServer ? "user-to-server" : "oauth";
   return {
     type: "token",
-    token,
+    token: token2,
     tokenType
   };
 }
-function withAuthorizationPrefix(token) {
-  if (token.split(/\./).length === 3) {
-    return `bearer ${token}`;
+function withAuthorizationPrefix(token2) {
+  if (token2.split(/\./).length === 3) {
+    return `bearer ${token2}`;
   }
-  return `token ${token}`;
+  return `token ${token2}`;
 }
-async function hook(token, request2, route, parameters) {
+async function hook(token2, request2, route, parameters) {
   const endpoint2 = request2.endpoint.merge(
     route,
     parameters
   );
-  endpoint2.headers.authorization = withAuthorizationPrefix(token);
+  endpoint2.headers.authorization = withAuthorizationPrefix(token2);
   return request2(endpoint2);
 }
-var createTokenAuth = function createTokenAuth2(token) {
-  if (!token) {
+var createTokenAuth = function createTokenAuth2(token2) {
+  if (!token2) {
     throw new Error("[@octokit/auth-token] No token passed to createTokenAuth");
   }
-  if (typeof token !== "string") {
+  if (typeof token2 !== "string") {
     throw new Error(
       "[@octokit/auth-token] Token passed to createTokenAuth is not a string"
     );
   }
-  token = token.replace(/^(token|bearer) +/i, "");
-  return Object.assign(auth.bind(null, token), {
-    hook: hook.bind(null, token)
+  token2 = token2.replace(/^(token|bearer) +/i, "");
+  return Object.assign(auth.bind(null, token2), {
+    hook: hook.bind(null, token2)
   });
 };
 
@@ -24059,9 +24059,9 @@ var defaults = {
   }
 };
 var GitHub = Octokit.plugin(restEndpointMethods, paginateRest).defaults(defaults);
-function getOctokitOptions(token, options) {
+function getOctokitOptions(token2, options) {
   const opts = Object.assign({}, options || {});
-  const auth2 = getAuthString(token, opts);
+  const auth2 = getAuthString(token2, opts);
   if (auth2) {
     opts.auth = auth2;
   }
@@ -24074,9 +24074,9 @@ function getOctokitOptions(token, options) {
 
 // node_modules/.pnpm/@actions+github@9.1.1/node_modules/@actions/github/lib/github.js
 var context2 = new Context();
-function getOctokit(token, options, ...additionalPlugins) {
+function getOctokit(token2, options, ...additionalPlugins) {
   const GitHubWithPlugins = GitHub.plugin(...additionalPlugins);
-  return new GitHubWithPlugins(getOctokitOptions(token, options));
+  return new GitHubWithPlugins(getOctokitOptions(token2, options));
 }
 
 // actions/lib/util.ts
@@ -24093,10 +24093,10 @@ function getInputOpt(name) {
 }
 
 // actions/statuses-add/main.ts
-var appToken = getInput2("app-token");
+var token = getInput2("token");
 var reportPath = getInput2("report-path");
 var targetUrl = getInputOpt("target-url");
-var octo = getOctokit(appToken);
+var octo = getOctokit(token);
 var repo = context2.repo;
 function phaseLabel(phase) {
   if (phase.success === null) return "skipped";

@@ -4,9 +4,9 @@ description: >
   Add per-repo commit statuses of the form `subrepo/<repo>` from a build report.
 
 inputs:
-  app-token:
-    description: GitHub app token.
-    required: true
+  token:
+    description: GitHub token with permission to read and write commit statuses.
+    default: ${{ github.token }}
 
   report-path:
     description: Path to the JSON build report produced by `build.py --report`.
