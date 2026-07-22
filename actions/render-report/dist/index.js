@@ -24208,14 +24208,20 @@ function renderCompact(report, reportStyle2) {
   }
   return lines;
 }
-function renderDelta(report, statusReport) {
+function renderDelta(report, statusReport, reportStyle2) {
   const turnedRed = [];
   const turnedGreen = [];
+  const unchanged = [];
   for (const repo of report.repos) {
     const wasGreen = statusReport[repo.name];
     if (wasGreen === true && !repo.green) turnedRed.push(repo);
     else if (wasGreen === false && repo.green) turnedGreen.push(repo);
+    else unchanged.push(repo);
   }
+  assert(
+    turnedRed.length > 0 || turnedGreen.length > 0,
+    "nothing changed, aborting delta report"
+  );
   const lines = [];
   if (turnedRed.length > 0) {
     lines.push("**Recently turned red:**", "", ...renderTable(turnedRed));
@@ -24223,6 +24229,12 @@ function renderDelta(report, statusReport) {
   if (turnedGreen.length > 0) {
     if (lines.length > 0) lines.push("");
     lines.push("**Recently turned green:**", "", ...renderTable(turnedGreen));
+  }
+  if (unchanged.length > 0) {
+    lines.push(
+      "",
+      ...renderSpoiler(reportStyle2, "Unchanged", renderTable(unchanged))
+    );
   }
   return lines;
 }
@@ -24237,7 +24249,7 @@ async function renderBody(buildReport, statusReport, reportType2, reportStyle2) 
         statusReport !== null,
         'status report is required for "delta" report type'
       );
-      return renderDelta(buildReport, statusReport);
+      return renderDelta(buildReport, statusReport, reportStyle2);
   }
 }
 function renderReport(report, bodyLines) {

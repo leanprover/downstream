@@ -104,15 +104,23 @@ function renderCompact(
 function renderDelta(
   report: BuildReport,
   statusReport: StatusReport,
+  reportStyle: ReportStyle,
 ): string[] {
   const turnedRed: BuildReportRepo[] = [];
   const turnedGreen: BuildReportRepo[] = [];
+  const unchanged: BuildReportRepo[] = [];
 
   for (const repo of report.repos) {
     const wasGreen = statusReport[repo.name];
     if (wasGreen === true && !repo.green) turnedRed.push(repo);
     else if (wasGreen === false && repo.green) turnedGreen.push(repo);
+    else unchanged.push(repo);
   }
+
+  assert(
+    turnedRed.length > 0 || turnedGreen.length > 0,
+    "nothing changed, aborting delta report",
+  );
 
   const lines: string[] = [];
 
@@ -123,6 +131,13 @@ function renderDelta(
   if (turnedGreen.length > 0) {
     if (lines.length > 0) lines.push("");
     lines.push("**Recently turned green:**", "", ...renderTable(turnedGreen));
+  }
+
+  if (unchanged.length > 0) {
+    lines.push(
+      "",
+      ...renderSpoiler(reportStyle, "Unchanged", renderTable(unchanged)),
+    );
   }
 
   return lines;
@@ -144,7 +159,7 @@ async function renderBody(
         statusReport !== null,
         'status report is required for "delta" report type',
       );
-      return renderDelta(buildReport, statusReport);
+      return renderDelta(buildReport, statusReport, reportStyle);
   }
 }
 
