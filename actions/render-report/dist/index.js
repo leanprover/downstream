@@ -24206,7 +24206,7 @@ function renderCompact(report, reportStyle2) {
       ...renderSpoiler(reportStyle2, "Green repos", renderTable(greenRepos))
     );
   }
-  return lines;
+  return { lines, empty: redRepos.length === 0 };
 }
 function renderDelta(report, statusReport, reportStyle2) {
   const turnedRed = [];
@@ -24218,10 +24218,6 @@ function renderDelta(report, statusReport, reportStyle2) {
     else if (wasGreen === false && repo.green) turnedGreen.push(repo);
     else unchanged.push(repo);
   }
-  assert(
-    turnedRed.length > 0 || turnedGreen.length > 0,
-    "nothing changed, aborting delta report"
-  );
   const lines = [];
   if (turnedRed.length > 0) {
     lines.push("**Recently turned red:**", "", ...renderTable(turnedRed));
@@ -24231,17 +24227,17 @@ function renderDelta(report, statusReport, reportStyle2) {
     lines.push("**Recently turned green:**", "", ...renderTable(turnedGreen));
   }
   if (unchanged.length > 0) {
+    if (lines.length > 0) lines.push("");
     lines.push(
-      "",
       ...renderSpoiler(reportStyle2, "Unchanged", renderTable(unchanged))
     );
   }
-  return lines;
+  return { lines, empty: turnedRed.length === 0 && turnedGreen.length === 0 };
 }
-async function renderBody(buildReport, statusReport, reportType2, reportStyle2) {
+function renderBody(buildReport, statusReport, reportType2, reportStyle2) {
   switch (reportType2) {
     case "full":
-      return renderTable(buildReport.repos);
+      return { lines: renderTable(buildReport.repos), empty: false };
     case "compact":
       return renderCompact(buildReport, reportStyle2);
     case "delta":
@@ -24253,7 +24249,6 @@ async function renderBody(buildReport, statusReport, reportType2, reportStyle2) 
   }
 }
 function renderReport(report, bodyLines) {
-  assert(bodyLines.length > 0, "Report must not be empty");
   const { context: context3 } = github_exports;
   const repoUrl = `${context3.serverUrl}/${context3.repo.owner}/${context3.repo.repo}`;
   const commitUrl = `${repoUrl}/commit/${report.commit_sha}`;
@@ -24274,7 +24269,7 @@ async function loadReport(path) {
 async function run() {
   const buildReport = await loadReport(buildReportPath);
   const statusReport = statusReportPath ? await loadReport(statusReportPath) : null;
-  const lines = await renderBody(
+  const { lines, empty } = renderBody(
     buildReport,
     statusReport,
     reportType,
@@ -24282,6 +24277,7 @@ async function run() {
   );
   const rendered = renderReport(buildReport, lines);
   setOutput("report", rendered);
+  setOutput("empty", String(empty));
   if (outputPath !== null) await fs3.writeFile(outputPath, rendered);
 }
 run().catch((error2) => {
