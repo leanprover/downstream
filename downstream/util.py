@@ -52,7 +52,11 @@ class Subrepo:
     aliases: list[str]
     critical: bool
     override_only: bool
+    build_targets: list[str]
+    build_options: list[str]
+    test_options: list[str]
     test_args: list[str]
+    lint_options: list[str]
     lint_args: list[str]
 
     @property
@@ -77,6 +81,10 @@ def load_subrepos(path: Path) -> Generator[Subrepo]:
             aliases=[normalize_url(url) for url in data.get("aliases", [])],
             critical=data.get("critical", True),
             override_only=data.get("override_only", False),
+            build_targets=data.get("build_targets", []),
+            build_options=data.get("build_options", []),
+            test_options=data.get("test_options", []),
             test_args=data.get("test_args", []),
+            lint_options=data.get("lint_options", []),
             lint_args=data.get("lint_args", []),
         )
