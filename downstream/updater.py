@@ -6,7 +6,14 @@ from pathlib import Path
 from subprocess import CalledProcessError
 
 from downstream.merge_tree_theirs import merge_tree_theirs
-from downstream.util import Subrepo, github_full_name, load_subrepos, normalize_url, run
+from downstream.util import (
+    Subrepo,
+    github_full_name,
+    group,
+    load_subrepos,
+    normalize_url,
+    run,
+)
 
 
 class Updater:
@@ -168,52 +175,53 @@ class Updater:
         return run("git", "rev-parse", f"HEAD:{path}", capture=True).stdout.strip()
 
     def add_subrepo(self, subrepo: Subrepo) -> None:
-        print(f"::group::add {subrepo.name}", flush=True)
-        self.reset()
+        with group(f"add {subrepo.name}"):
+            self.reset()
 
-        rev_sha, rev_tree = self.fetch_sha_tree(subrepo.url, subrepo.rev)
-        self.restore_tree_to(rev_tree, subrepo.path)
-        self.fixup_subrepo_and_commit(subrepo, rev_sha, f"add repo {subrepo.name}")
-        print("::endgroup::", flush=True)
+            rev_sha, rev_tree = self.fetch_sha_tree(subrepo.url, subrepo.rev)
+            self.restore_tree_to(rev_tree, subrepo.path)
+            self.fixup_subrepo_and_commit(subrepo, rev_sha, f"add repo {subrepo.name}")
 
     def reset_subrepo(self, subrepo: Subrepo) -> None:
-        print(f"::group::reset {subrepo.name}", flush=True)
-        self.reset()
+        with group(f"reset {subrepo.name}"):
+            self.reset()
 
-        rev_sha, rev_tree = self.fetch_sha_tree(subrepo.url, subrepo.rev)
-        self.restore_tree_to(rev_tree, subrepo.path)
-        self.fixup_subrepo_and_commit(subrepo, rev_sha, f"reset repo {subrepo.name}")
-        print("::endgroup::", flush=True)
+            rev_sha, rev_tree = self.fetch_sha_tree(subrepo.url, subrepo.rev)
+            self.restore_tree_to(rev_tree, subrepo.path)
+            self.fixup_subrepo_and_commit(
+                subrepo, rev_sha, f"reset repo {subrepo.name}"
+            )
 
     def update_subrepo(self, subrepo: Subrepo) -> None:
-        print(f"::group::update {subrepo.name}", flush=True)
-        self.reset()
+        with group(f"update {subrepo.name}"):
+            self.reset()
 
-        rev_sha, rev_tree = self.fetch_sha_tree(subrepo.url, subrepo.rev)
-        our_tree = self.get_tree_in_head(subrepo.name)
-        base_sha = self.find_latest_subrepo_sha(subrepo)
-        _, base_tree = self.fetch_sha_tree(subrepo.url, base_sha)
-        merged_tree = merge_tree_theirs(base_tree, our_tree, rev_tree)
+            rev_sha, rev_tree = self.fetch_sha_tree(subrepo.url, subrepo.rev)
+            our_tree = self.get_tree_in_head(subrepo.name)
+            base_sha = self.find_latest_subrepo_sha(subrepo)
+            _, base_tree = self.fetch_sha_tree(subrepo.url, base_sha)
+            merged_tree = merge_tree_theirs(base_tree, our_tree, rev_tree)
 
-        self.restore_tree_to(merged_tree, subrepo.path)
-        self.fixup_subrepo_and_commit(subrepo, rev_sha, f"update repo {subrepo.name}")
-        print("::endgroup::", flush=True)
+            self.restore_tree_to(merged_tree, subrepo.path)
+            self.fixup_subrepo_and_commit(
+                subrepo, rev_sha, f"update repo {subrepo.name}"
+            )
 
     def fixup_subrepo(self, subrepo: Subrepo) -> None:
-        print(f"::group::fixup {subrepo.name}", flush=True)
-        self.reset()
+        with group(f"fixup {subrepo.name}"):
+            self.reset()
 
-        base_sha = self.find_latest_subrepo_sha(subrepo)
-        self.fixup_subrepo_and_commit(subrepo, base_sha, f"fixup repo {subrepo.name}")
-        print("::endgroup::", flush=True)
+            base_sha = self.find_latest_subrepo_sha(subrepo)
+            self.fixup_subrepo_and_commit(
+                subrepo, base_sha, f"fixup repo {subrepo.name}"
+            )
 
     def remove_subrepo(self, path: Path) -> None:
-        print(f"::group::prune {path.name}", flush=True)
-        self.reset()
+        with group(f"remove {path.name}"):
+            self.reset()
 
-        run("git", "rm", "-rf", path)
-        self.commit(f"downstream: remove repo {path.name}")
-        print("::endgroup::", flush=True)
+            run("git", "rm", "-rf", path)
+            self.commit(f"downstream: remove repo {path.name}")
 
     def add_or_reset_subrepo(self, subrepo: Subrepo) -> None:
         if subrepo.path.exists():
