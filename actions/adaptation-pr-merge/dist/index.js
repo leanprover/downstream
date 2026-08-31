@@ -24837,7 +24837,8 @@ async function postOrUpdateStatus(options) {
     issueNumber,
     body,
     marker = MARKER,
-    final = false
+    final = false,
+    repost = false
   } = options;
   const login = `${appSlug2}[bot]`;
   const comments = await octo2.paginate(octo2.rest.issues.listComments, {
@@ -24852,6 +24853,16 @@ async function postOrUpdateStatus(options) {
 
 <!-- marker: ${marker} -->`;
   if (comment === void 0) {
+    await octo2.rest.issues.createComment({
+      ...repo,
+      issue_number: issueNumber,
+      body: fullBody
+    });
+  } else if (repost) {
+    await octo2.rest.issues.deleteComment({
+      ...repo,
+      comment_id: comment.id
+    });
     await octo2.rest.issues.createComment({
       ...repo,
       issue_number: issueNumber,

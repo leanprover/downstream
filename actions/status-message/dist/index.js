@@ -23639,7 +23639,8 @@ async function postOrUpdateStatus(options) {
     issueNumber: issueNumber2,
     body: body2,
     marker: marker2 = MARKER,
-    final = false
+    final = false,
+    repost: repost2 = false
   } = options;
   const login = `${appSlug2}[bot]`;
   const comments = await octo2.paginate(octo2.rest.issues.listComments, {
@@ -23654,6 +23655,16 @@ async function postOrUpdateStatus(options) {
 
 <!-- marker: ${marker2} -->`;
   if (comment === void 0) {
+    await octo2.rest.issues.createComment({
+      ...repo2,
+      issue_number: issueNumber2,
+      body: fullBody
+    });
+  } else if (repost2) {
+    await octo2.rest.issues.deleteComment({
+      ...repo2,
+      comment_id: comment.id
+    });
     await octo2.rest.issues.createComment({
       ...repo2,
       issue_number: issueNumber2,
@@ -24130,6 +24141,9 @@ function getInputOpt(name) {
   const value = getInput(name, { required: false });
   return value === "" ? null : value;
 }
+function parseBool(input) {
+  return input.trim().toLowerCase() === "true";
+}
 
 // actions/status-message/main.ts
 var appToken = getInput2("app-token");
@@ -24138,6 +24152,7 @@ var issueNumber = parseInt(getInput2("issue"), 10);
 var body = getInputOpt("body");
 var bodyPath = getInputOpt("body-path");
 var marker = getInputOpt("marker");
+var repost = parseBool(getInputOpt("repost") ?? "false");
 var octo = getOctokit(appToken);
 var repo = context2.repo;
 async function getBody() {
@@ -24152,7 +24167,8 @@ async function run() {
     repo,
     issueNumber,
     body: await getBody(),
-    marker: marker ?? void 0
+    marker: marker ?? void 0,
+    repost
   });
 }
 run().catch((error2) => {
