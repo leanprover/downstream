@@ -1,5 +1,9 @@
 name: Create an adaptation PR
 
+description: >
+  Create or update the adaptation PR for a labeled upstream PR, keeping its
+  branch, title and state in sync with the upstream PR.
+
 inputs:
   app-token:
     description: GitHub app token.
