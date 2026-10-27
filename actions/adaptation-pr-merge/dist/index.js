@@ -25266,9 +25266,10 @@ async function findAdaptationPrMergeCandidates() {
   });
   return prs.filter((pr) => {
     const labels = pr.labels.map((l) => l.name);
-    const isAdaptation = labels.includes(downstreamLabel);
-    const mustMerge = labels.includes(downstreamLabelMerge);
-    return isAdaptation && !mustMerge;
+    if (!labels.includes(downstreamLabel)) return false;
+    if (labels.includes(downstreamLabelMerge)) return false;
+    if (pr.head.repo.full_name !== downstreamRepo.fullName) return false;
+    return true;
   });
 }
 async function isReachableFromRev(uPr) {

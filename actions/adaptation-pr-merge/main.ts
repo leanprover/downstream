@@ -161,9 +161,20 @@ async function findAdaptationPrMergeCandidates(): Promise<ListPr[]> {
   });
   return prs.filter((pr) => {
     const labels = pr.labels.map((l) => l.name);
-    const isAdaptation = labels.includes(downstreamLabel);
-    const mustMerge = labels.includes(downstreamLabelMerge);
-    return isAdaptation && !mustMerge;
+
+    // The PR must be labeled as an adaptation PR.
+    if (!labels.includes(downstreamLabel)) return false;
+
+    // The PR must not be marked for manual merge, which would indicate that
+    // we've already tried and failed to merge it before.
+    if (labels.includes(downstreamLabelMerge)) return false;
+
+    // We don't want to auto-merge any old PR that someone has slapped the
+    // correct labels on; the PR needs to be created from this repo showing that
+    // the author had write permissions, i.e. was trusted.
+    if (pr.head.repo.full_name !== downstreamRepo.fullName) return false;
+
+    return true;
   });
 }
 
