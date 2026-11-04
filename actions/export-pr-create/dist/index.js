@@ -25078,6 +25078,34 @@ var Repo = class {
 };
 async function findPrFor(octo, repo, branchName, options = {}) {
   const { state = "all", headRepo = repo } = options;
+  const fullName = headRepo.fullName.toLowerCase();
+  if (headRepo.owner === repo.owner && fullName !== repo.fullName.toLowerCase()) {
+    const states = {
+      open: ["OPEN"],
+      closed: ["CLOSED", "MERGED"],
+      all: ["OPEN", "CLOSED", "MERGED"]
+    }[state];
+    const result = await octo.graphql(
+      `query($owner: String!, $name: String!, $branch: String!, $states: [PullRequestState!]) {
+        repository(owner: $owner, name: $name) {
+          pullRequests(headRefName: $branch, states: $states, first: 100,
+                       orderBy: { field: CREATED_AT, direction: DESC }) {
+            nodes { number headRepository { nameWithOwner } }
+          }
+        }
+      }`,
+      { owner: repo.owner, name: repo.repo, branch: branchName, states }
+    );
+    const match = result.repository.pullRequests.nodes.find(
+      (pr2) => pr2.headRepository?.nameWithOwner.toLowerCase() === fullName
+    );
+    if (match === void 0) return void 0;
+    const { data: data2 } = await octo.rest.pulls.get({
+      ...repo,
+      pull_number: match.number
+    });
+    return data2;
+  }
   const { data } = await octo.rest.pulls.list({
     ...repo,
     head: `${headRepo.owner}:${branchName}`,
@@ -25086,7 +25114,6 @@ async function findPrFor(octo, repo, branchName, options = {}) {
     direction: "desc",
     per_page: 100
   });
-  const fullName = headRepo.fullName.toLowerCase();
   return data.find((pr2) => pr2.head.repo?.full_name.toLowerCase() === fullName);
 }
 

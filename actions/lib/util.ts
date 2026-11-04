@@ -117,6 +117,52 @@ export async function findPrFor(
   options: FindPrForOptions = {},
 ): Promise<ListPr | undefined> {
   const { state = "all", headRepo = repo } = options;
+  const fullName = headRepo.fullName.toLowerCase();
+
+  // The REST head filter `owner:branch` resolves `owner` to the base repo when
+  // the head repo is a fork with the same owner (e.g. mathlib4-nightly-testing
+  // for mathlib4), so it never finds those PRs. GraphQL filters by branch name
+  // only, so check the head repo explicitly.
+  if (
+    headRepo.owner === repo.owner &&
+    fullName !== repo.fullName.toLowerCase()
+  ) {
+    const states = {
+      open: ["OPEN"],
+      closed: ["CLOSED", "MERGED"],
+      all: ["OPEN", "CLOSED", "MERGED"],
+    }[state];
+    const result = await octo.graphql<{
+      repository: {
+        pullRequests: {
+          nodes: {
+            number: number;
+            headRepository: { nameWithOwner: string } | null;
+          }[];
+        };
+      };
+    }>(
+      `query($owner: String!, $name: String!, $branch: String!, $states: [PullRequestState!]) {
+        repository(owner: $owner, name: $name) {
+          pullRequests(headRefName: $branch, states: $states, first: 100,
+                       orderBy: { field: CREATED_AT, direction: DESC }) {
+            nodes { number headRepository { nameWithOwner } }
+          }
+        }
+      }`,
+      { owner: repo.owner, name: repo.repo, branch: branchName, states },
+    );
+    const match = result.repository.pullRequests.nodes.find(
+      (pr) => pr.headRepository?.nameWithOwner.toLowerCase() === fullName,
+    );
+    if (match === undefined) return undefined;
+    const { data } = await octo.rest.pulls.get({
+      ...repo,
+      pull_number: match.number,
+    });
+    return data as unknown as ListPr;
+  }
+
   // The head filter only checks the owner, so PRs from other repos of the same
   // owner (e.g. a fork owned by the same org) may also match. In practice, this
   // is unlikely to be a problem, but just to make sure, we check the repo name.
@@ -128,7 +174,6 @@ export async function findPrFor(
     direction: "desc",
     per_page: 100,
   });
-  const fullName = headRepo.fullName.toLowerCase();
   return data.find((pr) => pr.head.repo?.full_name.toLowerCase() === fullName);
 }
 
