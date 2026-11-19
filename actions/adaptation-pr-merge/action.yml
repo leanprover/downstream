@@ -1,5 +1,10 @@
 name: Merge zero or more adaptation PRs
 
+description: >
+  Merge each open adaptation PR whose upstream PR has landed in the given
+  upstream revision, closing it instead if it has no changes left. Reports the
+  PRs that need manual attention.
+
 inputs:
   app-token:
     description: GitHub app token.
