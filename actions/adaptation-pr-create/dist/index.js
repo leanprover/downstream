@@ -25504,8 +25504,7 @@ async function run() {
   const mergeBaseSha = await getMergeBase(uPr);
   const base = await findBase(uPr, mergeBaseSha);
   if (!hasForceLabel) {
-    if (aBranch === void 0)
-      await ensureCorrectMergeBase(prefix, uPr, mergeBaseSha, base);
+    await ensureCorrectMergeBase(prefix, uPr, mergeBaseSha, base);
     await ensureUpstreamCiGreen(prefix, uPr);
   }
   assert(overrideToolchain !== null, "at least one override is required");

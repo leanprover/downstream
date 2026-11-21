@@ -502,8 +502,12 @@ async function run(): Promise<void> {
     // don't wait for green CI only to then be told to rebase, which they
     // could've done all along. Also, if we eventually support automatic rebase,
     // we don't want to delay it by waiting for CI.
-    if (aBranch === undefined)
-      await ensureCorrectMergeBase(prefix, uPr, mergeBaseSha, base);
+    //
+    // This also applies when the adaptation branch already exists: if the PR
+    // has since been rebased onto a commit that is not known to be green, the
+    // adaptation branch would be built with a toolchain containing changes it
+    // has not been adapted to.
+    await ensureCorrectMergeBase(prefix, uPr, mergeBaseSha, base);
 
     await ensureUpstreamCiGreen(prefix, uPr);
   }
